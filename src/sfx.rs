@@ -17,6 +17,7 @@ pub struct Sfx
 	sink: Sink,
 	stream: Option<AudioStream>,
 	music_file: String,
+	music_volume_factor: f32,
 	sample_instances: Vec<SampleInstance>,
 	exclusive_sounds: Vec<String>,
 	exclusive_instance: Option<SampleInstance>,
@@ -46,6 +47,7 @@ impl Sfx
 			exclusive_sounds: vec![],
 			samples: HashMap::new(),
 			music_file: "".into(),
+			music_volume_factor: 1.0,
 		};
 		sfx.set_sfx_volume(sfx_volume);
 		sfx.set_music_volume(music_volume);
@@ -53,9 +55,10 @@ impl Sfx
 		Ok(sfx)
 	}
 
-	pub fn set_music_file(&mut self, music: &str)
+	pub fn set_music_file(&mut self, music: &str, music_volume_factor: f32)
 	{
 		self.music_file = music.to_string();
+		self.music_volume_factor = music_volume_factor;
 	}
 
 	pub fn cache_sample<'l>(&'l mut self, name: &str) -> Result<&'l Sample>
@@ -109,6 +112,24 @@ impl Sfx
 			}
 		}
 
+		Ok(())
+	}
+
+	pub fn play_sound_with_pitch(&mut self, name: &str, pitch: f32) -> Result<()>
+	{
+		self.cache_sample(name)?;
+		let sample = self.samples.get(name).unwrap();
+		let instance = self
+			.sink
+			.play_sample(
+				sample,
+				self.sfx_volume,
+				None,
+				thread_rng().gen_range(0.9..1.1) * pitch,
+				Playmode::Once,
+			)
+			.map_err(|_| "Couldn't play sound".to_string())?;
+		self.sample_instances.push(instance);
 		Ok(())
 	}
 
@@ -184,8 +205,10 @@ impl Sfx
 		let mut new_stream = AudioStream::load(&self.audio, &self.music_file)
 			.map_err(|_| format!("Couldn't load {}", self.music_file))?;
 		new_stream.attach(&mut self.sink).unwrap();
-		//~ new_stream.set_playmode(Playmode::Loop).unwrap();
-		new_stream.set_gain(self.music_volume).unwrap();
+		new_stream.set_playmode(Playmode::Loop).unwrap();
+		new_stream
+			.set_gain(self.music_volume * self.music_volume_factor)
+			.unwrap();
 		self.stream = Some(new_stream);
 		Ok(())
 	}

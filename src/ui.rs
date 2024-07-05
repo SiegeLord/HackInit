@@ -1,3 +1,6 @@
+// TODO: Debounce option saving
+// TODO: Delayed actions for transitions
+// TODO: Fallbile screen creation.
 use crate::error::Result;
 use crate::{components, controls, game_state, utils};
 
