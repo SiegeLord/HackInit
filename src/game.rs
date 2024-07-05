@@ -92,7 +92,7 @@ impl Game
 		}
 		else
 		{
-			if let Some(action) = self.subscreens.input(state, event)
+			if let Some(action) = self.subscreens.input(state, event)?
 			{
 				match action
 				{

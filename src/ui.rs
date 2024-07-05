@@ -1,5 +1,4 @@
 // TODO: Delayed actions for transitions
-// TODO: Fallbile screen creation.
 use crate::error::Result;
 use crate::{components, controls, game_state, utils};
 
@@ -26,7 +25,7 @@ pub enum Action
 	Start,
 	Quit,
 	Back,
-	Forward(fn(&mut game_state::GameState) -> SubScreen),
+	Forward(fn(&mut game_state::GameState) -> Result<SubScreen>),
 	ToggleFullscreen,
 	ToggleFracScale,
 	ChangeInput(controls::Action, usize),
@@ -814,13 +813,13 @@ impl MainMenu
 				w,
 				h,
 				"Controls",
-				Action::Forward(|s| SubScreen::ControlsMenu(ControlsMenu::new(s))),
+				Action::Forward(|s| Ok(SubScreen::ControlsMenu(ControlsMenu::new(s)))),
 			))],
 			&[Widget::Button(Button::new(
 				w,
 				h,
 				"Options",
-				Action::Forward(|s| SubScreen::OptionsMenu(OptionsMenu::new(s))),
+				Action::Forward(|s| Ok(SubScreen::OptionsMenu(OptionsMenu::new(s)))),
 			))],
 			&[Widget::Button(Button::new(w, h, "Quit", Action::Quit))],
 		]);
@@ -1192,13 +1191,13 @@ impl InGameMenu
 				w,
 				h,
 				"Controls",
-				Action::Forward(|s| SubScreen::ControlsMenu(ControlsMenu::new(s))),
+				Action::Forward(|s| Ok(SubScreen::ControlsMenu(ControlsMenu::new(s)))),
 			))],
 			&[Widget::Button(Button::new(
 				w,
 				h,
 				"Options",
-				Action::Forward(|s| SubScreen::OptionsMenu(OptionsMenu::new(s))),
+				Action::Forward(|s| Ok(SubScreen::OptionsMenu(OptionsMenu::new(s)))),
 			))],
 			&[Widget::Button(Button::new(w, h, "Quit", Action::MainMenu))],
 		]);
@@ -1291,7 +1290,9 @@ impl SubScreens
 		}
 	}
 
-	pub fn input(&mut self, state: &mut game_state::GameState, event: &Event) -> Option<Action>
+	pub fn input(
+		&mut self, state: &mut game_state::GameState, event: &Event,
+	) -> Result<Option<Action>>
 	{
 		if let Some(action) = self.subscreens.last_mut().unwrap().input(state, event)
 		{
@@ -1299,16 +1300,16 @@ impl SubScreens
 			{
 				Action::Forward(subscreen_fn) =>
 				{
-					self.subscreens.push(subscreen_fn(state));
+					self.subscreens.push(subscreen_fn(state)?);
 				}
 				Action::Back =>
 				{
 					self.subscreens.pop().unwrap();
 				}
-				action @ _ => return Some(action),
+				action @ _ => return Ok(Some(action)),
 			}
 		}
-		None
+		Ok(None)
 	}
 
 	pub fn resize(&mut self, state: &game_state::GameState)
