@@ -46,18 +46,6 @@ impl Menu
 					state.mouse_pos = Point2::new(x as i32, y as i32);
 				}
 			}
-			Event::KeyDown {
-				keycode: KeyCode::Escape,
-				..
-			} =>
-			{
-				if !self.subscreens.is_empty()
-				{
-					state.sfx.play_sound("data/ui2.ogg").unwrap();
-					self.subscreens.pop();
-					return Ok(None);
-				}
-			}
 			_ => (),
 		}
 		if let Some(action) = self.subscreens.input(state, event)

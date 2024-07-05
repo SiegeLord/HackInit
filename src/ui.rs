@@ -1,4 +1,3 @@
-// TODO: Debounce option saving
 // TODO: Delayed actions for transitions
 // TODO: Fallbile screen creation.
 use crate::error::Result;
@@ -627,7 +626,7 @@ impl WidgetList
 				if cur_action.is_some()
 				{
 					action = cur_action;
-					if self.cur_selection != (i, j)
+					if self.cur_selection != (i, j) && action == Some(Action::SelectMe)
 					{
 						state.sfx.play_sound("data/ui1.ogg").unwrap();
 					}
@@ -982,6 +981,10 @@ impl ControlsMenu
 					state.controls.set_mouse_sensitivity(ms);
 					options_changed = true;
 				}
+				Some(Action::Back) =>
+				{
+					game_state::save_options(&state.core, &state.options).unwrap();
+				}
 				_ => (),
 			}
 		}
@@ -1007,7 +1010,6 @@ impl ControlsMenu
 				}
 			}
 			state.options.controls = state.controls.get_controls().clone();
-			game_state::save_options(&state.core, &state.options).unwrap();
 		}
 		action
 	}
@@ -1120,7 +1122,6 @@ impl OptionsMenu
 
 	pub fn input(&mut self, state: &mut game_state::GameState, event: &Event) -> Option<Action>
 	{
-		let mut options_changed = false;
 		let action = self.widgets.input(state, event);
 		if let Some(action) = action
 		{
@@ -1129,41 +1130,36 @@ impl OptionsMenu
 				Action::ToggleFullscreen =>
 				{
 					state.options.fullscreen = !state.options.fullscreen;
-					options_changed = true;
 				}
 				Action::ToggleFracScale =>
 				{
 					state.options.frac_scale = !state.options.frac_scale;
-					options_changed = true;
 				}
 				Action::MusicVolume(v) =>
 				{
 					state.options.music_volume = v;
 					state.sfx.set_music_volume(v);
-					options_changed = true;
 				}
 				Action::CameraSpeed(i) =>
 				{
 					state.options.camera_speed = i;
-					options_changed = true;
 				}
 				Action::SfxVolume(v) =>
 				{
 					state.options.sfx_volume = v;
 					state.sfx.set_sfx_volume(v);
-					options_changed = true;
 				}
 				Action::UiScale(v) =>
 				{
 					state.options.ui_scale = v;
-					options_changed = true;
+				}
+				Action::Back =>
+				{
+					game_state::save_options(&state.core, &state.options).unwrap();
+					return Some(Action::Back);
 				}
 				_ => return Some(action),
 			}
-		}
-		if options_changed
-		{
-			game_state::save_options(&state.core, &state.options).unwrap();
 		}
 		None
 	}
