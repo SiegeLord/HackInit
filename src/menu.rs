@@ -26,7 +26,7 @@ impl Menu
 		state.sfx.cache_sample("data/ui2.ogg")?;
 		state.cache_sprite("data/title.cfg")?;
 
-		let mut subscreens = ui::SubScreens::new();
+		let mut subscreens = ui::SubScreens::new(state);
 		subscreens.push(ui::SubScreen::MainMenu(ui::MainMenu::new(state)));
 
 		Ok(Self { subscreens })
@@ -63,30 +63,7 @@ impl Menu
 	pub fn draw(&mut self, state: &game_state::GameState) -> Result<()>
 	{
 		state.core.clear_to_color(Color::from_rgb_f(0., 0., 0.5));
-		if self.subscreens.subscreens.len() == 1
-		{
-			let sprite = "data/title.cfg";
-			let sprite = state
-				.get_sprite(sprite)
-				.expect(&format!("Could not find sprite: {}", sprite));
-			sprite.draw(
-				Point2::new(state.buffer_width() / 2., state.buffer_height() / 2. - 125.),
-				0,
-				Color::from_rgb_f(1., 1., 1.),
-				state,
-			);
-		}
 		self.subscreens.draw(state);
-
-		let lh = state.ui_font().get_line_height() as f32;
-		state.core.draw_text(
-			state.ui_font(),
-			ui::UNSELECTED,
-			ui::HORIZ_SPACE,
-			state.buffer_height() - lh - ui::VERT_SPACE,
-			FontAlign::Left,
-			&format!("Version: {}", game_state::VERSION),
-		);
 
 		Ok(())
 	}

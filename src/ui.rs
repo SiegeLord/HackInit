@@ -1,4 +1,3 @@
-// TODO: Delayed actions for transitions
 use crate::error::Result;
 use crate::{components, controls, game_state, utils};
 
@@ -831,6 +830,26 @@ impl MainMenu
 	pub fn draw(&self, state: &game_state::GameState)
 	{
 		self.widgets.draw(state);
+
+		let sprite = "data/title.cfg";
+		let sprite = state
+			.get_sprite(sprite)
+			.expect(&format!("Could not find sprite: {}", sprite));
+		sprite.draw(
+			Point2::new(state.buffer_width() / 2., state.buffer_height() / 2. - 125.),
+			0,
+			Color::from_rgb_f(1., 1., 1.),
+			state,
+		);
+		let lh = state.ui_font().get_line_height() as f32;
+		state.core.draw_text(
+			state.ui_font(),
+			UNSELECTED,
+			HORIZ_SPACE,
+			state.buffer_height() - lh - VERT_SPACE,
+			FontAlign::Left,
+			&format!("Version: {}", game_state::VERSION),
+		);
 	}
 
 	pub fn input(&mut self, state: &mut game_state::GameState, event: &Event) -> Option<Action>
@@ -1273,29 +1292,68 @@ impl SubScreen
 pub struct SubScreens
 {
 	pub subscreens: Vec<SubScreen>,
+	pub action: Option<Action>,
+	pub time_to_transition: f64,
 }
+
+const TRANSITION_TIME: f64 = 0.25;
 
 impl SubScreens
 {
-	pub fn new() -> Self
+	pub fn new(state: &game_state::GameState) -> Self
 	{
-		Self { subscreens: vec![] }
+		Self {
+			subscreens: vec![],
+			action: None,
+			time_to_transition: state.core.get_time(),
+		}
+	}
+
+	pub fn reset_transition(&mut self, state: &game_state::GameState)
+	{
+		self.time_to_transition = state.core.get_time();
 	}
 
 	pub fn draw(&self, state: &game_state::GameState)
 	{
+		let time = state.core.get_time();
+		let f = if self.time_to_transition > time
+		{
+			-1. + (self.time_to_transition - time) / TRANSITION_TIME
+		}
+		else
+		{
+			(1. - (time - self.time_to_transition) / TRANSITION_TIME).max(0.)
+		};
+		let f = f as f32;
+		let mut transform = Transform::identity();
+		transform.translate(0., state.buffer_height() * f);
+		state.core.use_transform(&transform);
 		if let Some(subscreen) = self.subscreens.last()
 		{
 			subscreen.draw(state);
 		}
+		state.core.use_transform(&Transform::identity());
 	}
 
 	pub fn input(
 		&mut self, state: &mut game_state::GameState, event: &Event,
 	) -> Result<Option<Action>>
 	{
-		if let Some(action) = self.subscreens.last_mut().unwrap().input(state, event)
+		if self.action.is_none()
 		{
+			self.action = self.subscreens.last_mut().unwrap().input(state, event);
+			if self.action.is_some()
+			{
+				self.time_to_transition = state.core.get_time() + TRANSITION_TIME;
+			}
+		}
+		if let (Some(action), true) = (
+			self.action.clone(),
+			state.core.get_time() > self.time_to_transition,
+		)
+		{
+			self.action = None;
 			match action
 			{
 				Action::Forward(subscreen_fn) =>

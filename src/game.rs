@@ -23,7 +23,7 @@ impl Game
 	{
 		Ok(Self {
 			map: Map::new(state)?,
-			subscreens: ui::SubScreens::new(),
+			subscreens: ui::SubScreens::new(state),
 		})
 	}
 
@@ -87,6 +87,7 @@ impl Game
 			{
 				self.subscreens
 					.push(ui::SubScreen::InGameMenu(ui::InGameMenu::new(state)));
+				self.subscreens.reset_transition(state);
 				state.paused = true;
 			}
 		}
