@@ -1343,7 +1343,7 @@ impl SubScreens
 		if self.action.is_none()
 		{
 			self.action = self.subscreens.last_mut().unwrap().input(state, event);
-			if self.action.is_some()
+			if self.action.is_some() && self.action != Some(Action::SelectMe)
 			{
 				self.time_to_transition = state.core.get_time() + TRANSITION_TIME;
 			}
