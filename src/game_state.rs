@@ -200,7 +200,6 @@ impl GameState
 	pub fn resize_display(&mut self, display: &Display) -> Result<()>
 	{
 		const FIXED_BUFFER: bool = true;
-		const INTEGER_SCALE: bool = false;
 
 		let buffer_width;
 		let buffer_height;
