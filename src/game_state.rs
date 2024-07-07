@@ -142,7 +142,7 @@ impl GameState
 		core.install_mouse()
 			.map_err(|_| "Couldn't install mouse".to_string())?;
 
-		let mut sfx = sfx::Sfx::new(options.sfx_volume, options.music_volume, &core)?;
+		let sfx = sfx::Sfx::new(options.sfx_volume, options.music_volume, &core)?;
 		//sfx.set_music_file("data/lemonade-sinus.xm");
 		//sfx.play_music()?;
 
@@ -265,14 +265,20 @@ impl GameState
 		})
 	}
 
-	pub fn get_bitmap<'l>(&'l self, name: &str) -> Option<&'l Bitmap>
+	pub fn get_bitmap<'l>(&'l self, name: &str) -> Result<&'l Bitmap>
 	{
-		self.bitmaps.get(name)
+		Ok(self
+			.bitmaps
+			.get(name)
+			.ok_or_else(|| format!("{name} is not cached!"))?)
 	}
 
-	pub fn get_sprite<'l>(&'l self, name: &str) -> Option<&'l sprite::Sprite>
+	pub fn get_sprite<'l>(&'l self, name: &str) -> Result<&'l sprite::Sprite>
 	{
-		self.sprites.get(name)
+		Ok(self
+			.sprites
+			.get(name)
+			.ok_or_else(|| format!("{name} is not cached!"))?)
 	}
 
 	pub fn time(&self) -> f64
