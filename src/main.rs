@@ -91,6 +91,8 @@ fn real_main() -> Result<()>
 	let mut old_frac_scale = state.options.frac_scale;
 
 	let mut prev_frame_start = state.core.get_time();
+	let mut logic_end = prev_frame_start;
+	let mut frame_count = 0;
 	if state.options.grab_mouse
 	{
 		state.core.grab_mouse(&display).ok();
@@ -100,7 +102,7 @@ fn real_main() -> Result<()>
 	timer.start();
 	while !quit
 	{
-		if draw && queue.is_empty()
+		if queue.is_empty()
 		{
 			if state.display_width != display.get_width() as f32
 				|| state.display_height != display.get_height() as f32
@@ -183,16 +185,18 @@ fn real_main() -> Result<()>
 
 			state.core.flip_display();
 
-			if (state.tick + 1) % 120 == 0
+			if frame_count == 120
 			{
 				println!("FPS: {:.2}", 120. / (frame_start - prev_frame_start));
 				prev_frame_start = frame_start;
+				frame_count = 0;
 			}
+			frame_count += 1;
 			logics_without_draw = 0;
 			draw = false;
 		}
 
-		let event = queue.wait_for_event();
+		let event = queue.get_next_event();
 		let mut next_screen = match &mut cur_screen
 		{
 			Screen::Game(game) => game.input(&event, &mut state)?,
@@ -264,6 +268,7 @@ fn real_main() -> Result<()>
 				{
 					state.tick += 1;
 				}
+				logic_end = state.core.get_time();
 				draw = true;
 			}
 			_ => (),

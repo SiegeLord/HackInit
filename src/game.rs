@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::utils::DT;
 use crate::{astar, components as comps, controls, game_state, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
@@ -118,7 +119,6 @@ impl Game
 		}
 		else
 		{
-			state.core.clear_to_color(Color::from_rgb_f(0.5, 0.5, 1.));
 			self.map.draw(state)?;
 		}
 		Ok(())
@@ -157,12 +157,18 @@ impl Map
 		let mut to_die = vec![];
 
 		// Input.
+		if state.controls.get_action_state(controls::Action::Move) > 0.5
+		{
+			for (_, position) in self.world.query::<&mut comps::Position>().iter()
+			{
+				position.pos.y += 100. * DT;
+			}
+		}
+
+		// Movement.
 		for (_, position) in self.world.query::<&mut comps::Position>().iter()
 		{
-			if state.controls.get_action_state(controls::Action::Move) > 0.5
-			{
-				position.pos.x += 10.;
-			}
+			position.pos.x = (position.pos.x + 1500. * DT) % state.buffer_width();
 		}
 
 		// Remove dead entities
