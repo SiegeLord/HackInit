@@ -86,6 +86,8 @@ pub struct GameState
 	pub display_height: f32,
 	pub buffer1: Option<Bitmap>,
 	pub buffer2: Option<Bitmap>,
+
+	pub alpha: f32,
 }
 
 pub fn load_options(core: &Core) -> Result<Options>
@@ -169,6 +171,7 @@ impl GameState
 			controls: controls,
 			track_mouse: true,
 			mouse_pos: Point2::new(0, 0),
+			alpha: 0.,
 		})
 	}
 

@@ -132,7 +132,7 @@ impl Game
 
 pub fn spawn_obj(pos: Point2<f32>, world: &mut hecs::World) -> Result<hecs::Entity>
 {
-	let entity = world.spawn((comps::Position { pos: pos },));
+	let entity = world.spawn((comps::Position::new(pos),));
 	Ok(entity)
 }
 
@@ -156,6 +156,12 @@ impl Map
 	{
 		let mut to_die = vec![];
 
+		// Position snapshotting.
+		for (_, position) in self.world.query::<&mut comps::Position>().iter()
+		{
+			position.snapshot();
+		}
+
 		// Input.
 		if state.controls.get_action_state(controls::Action::Move) > 0.5
 		{
@@ -168,7 +174,12 @@ impl Map
 		// Movement.
 		for (_, position) in self.world.query::<&mut comps::Position>().iter()
 		{
-			position.pos.x = (position.pos.x + 1500. * DT) % state.buffer_width();
+			position.pos.x += 1500. * DT;
+			if position.pos.x > state.buffer_width()
+			{
+				position.pos.x %= state.buffer_width();
+				position.snapshot();
+			}
 		}
 
 		// Remove dead entities
@@ -198,8 +209,8 @@ impl Map
 		for (_, position) in self.world.query::<&comps::Position>().iter()
 		{
 			state.prim.draw_filled_circle(
-				position.pos.x,
-				position.pos.y,
+				position.draw_pos(state.alpha).x,
+				position.draw_pos(state.alpha).y,
 				16.,
 				Color::from_rgb_f(1.0, 0.0, 1.0),
 			);

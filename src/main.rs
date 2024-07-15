@@ -78,7 +78,6 @@ fn real_main() -> Result<()>
 	queue.register_event_source(timer.get_event_source());
 
 	let mut quit = false;
-	let mut draw = true;
 
 	let mut cur_screen = Screen::Menu(menu::Menu::new(&mut state)?);
 	//let mut cur_screen = Screen::Game(game::Game::new(
@@ -121,6 +120,7 @@ fn real_main() -> Result<()>
 
 			let frame_start = state.core.get_time();
 			state.core.set_target_bitmap(Some(state.buffer1()));
+			state.alpha = (frame_start - logic_end) as f32 / utils::DT;
 
 			match &mut cur_screen
 			{
@@ -193,7 +193,6 @@ fn real_main() -> Result<()>
 			}
 			frame_count += 1;
 			logics_without_draw = 0;
-			draw = false;
 		}
 
 		let event = queue.get_next_event();
@@ -269,7 +268,6 @@ fn real_main() -> Result<()>
 					state.tick += 1;
 				}
 				logic_end = state.core.get_time();
-				draw = true;
 			}
 			_ => (),
 		}
