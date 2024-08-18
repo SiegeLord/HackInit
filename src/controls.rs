@@ -3,6 +3,8 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
+use crate::utils;
+
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
 pub enum Action
 {
@@ -431,16 +433,29 @@ impl InputState
 
 	fn get(&mut self) -> f32
 	{
-		let mut max_strength = self.strength;
-		for strength in self.queue.drain(..)
+		if self.queue.is_empty()
 		{
-			self.strength = strength;
-			if strength > max_strength
-			{
-				max_strength = strength;
-			}
+			self.strength
 		}
-		max_strength
+		else
+		{
+			let mut current = 0.;
+			let mut previous = 0.;
+			for event in self.queue.drain(..)
+			{
+				self.strength = event;
+				if event > 0.
+				{
+					current = utils::max(current, event);
+				}
+				else
+				{
+					previous += current;
+					current = 0.;
+				}
+			}
+			current + previous
+		}
 	}
 
 	fn clear(&mut self)
@@ -634,7 +649,7 @@ impl ControlsHandler
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseZNeg)
 					{
-						state.push(self.controls.mouse_sensitivity * -*dz as f32);
+						state.push(-*dz as f32);
 						state.push(0.);
 					}
 				}
@@ -642,7 +657,7 @@ impl ControlsHandler
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseZPos)
 					{
-						state.push(self.controls.mouse_sensitivity * *dz as f32);
+						state.push(*dz as f32);
 						state.push(0.);
 					}
 				}
