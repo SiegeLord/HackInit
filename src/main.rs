@@ -53,8 +53,8 @@ fn real_main() -> Result<()>
 	let mut display = Display::new(&state.core, state.options.width, state.options.height)
 		.map_err(|_| "Couldn't create display".to_string())?;
 
-	let shader = utils::load_shader(&mut display, "data/basic")?;
 	let scale_shader = utils::load_shader(&mut display, "data/scale")?;
+	state.basic_shader = utils::load_shader(&mut display, "data/basic")?;
 	state.resize_display(&display)?;
 
 	let timer = Timer::new(&state.core, utils::DT as f64)
@@ -76,6 +76,12 @@ fn real_main() -> Result<()>
 			.expect("Couldn't get mouse"),
 	);
 	queue.register_event_source(timer.get_event_source());
+	queue.register_event_source(
+		state
+			.core
+			.get_joystick_event_source()
+			.expect("Couldn't get joystick"),
+	);
 
 	let mut quit = false;
 
@@ -137,7 +143,7 @@ fn real_main() -> Result<()>
 
 			state
 				.core
-				.use_shader(Some(&*shader.upgrade().unwrap()))
+				.use_shader(Some(&*state.basic_shader.upgrade().unwrap()))
 				.unwrap();
 
 			state
@@ -196,11 +202,16 @@ fn real_main() -> Result<()>
 		}
 
 		let event = queue.get_next_event();
+		state.controls.decode_event(&event);
+		state.game_ui_controls.decode_event(&event);
+		state.menu_controls.decode_event(&event);
 		let mut next_screen = match &mut cur_screen
 		{
 			Screen::Game(game) => game.input(&event, &mut state)?,
 			Screen::Menu(menu) => menu.input(&event, &mut state)?,
 		};
+		state.game_ui_controls.clear_action_states();
+		state.menu_controls.clear_action_states();
 
 		match event
 		{
@@ -238,6 +249,13 @@ fn real_main() -> Result<()>
 				//display.show_cursor(false).ok();
 				state.track_mouse = true;
 			}
+			Event::JoystickConfiguration { .. } =>
+			{
+				state
+					.core
+					.reconfigure_joysticks()
+					.map_err(|_| "Couldn't reconfigure joysticks".to_string())?;
+			}
 			Event::TimerTick { .. } =>
 			{
 				if logics_without_draw > 10
@@ -261,7 +279,7 @@ fn real_main() -> Result<()>
 				}
 
 				logics_without_draw += 1;
-				state.sfx.update_sounds()?;
+				state.sfx.update_sounds(&state.core)?;
 
 				if !state.paused
 				{
@@ -292,8 +310,7 @@ fn real_main() -> Result<()>
 			}
 		}
 	}
-	// To avoid clicks for the final sound.
-	state.core.rest(0.25);
+	state.sfx.fade_out(&state.core);
 
 	Ok(())
 }

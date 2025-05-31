@@ -27,7 +27,7 @@ impl Menu
 		state.cache_sprite("data/title.cfg")?;
 
 		let mut subscreens = ui::SubScreens::new(state);
-		subscreens.push(ui::SubScreen::MainMenu(ui::MainMenu::new(state)));
+		subscreens.push(ui::SubScreen::MainMenu(ui::MainMenu::new(state)?));
 
 		Ok(Self { subscreens })
 	}

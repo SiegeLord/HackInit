@@ -115,9 +115,45 @@ pub fn clamp<T: PartialOrd>(x: T, min: T, max: T) -> T
 	}
 }
 
-pub fn round_point(vec: Point2<f32>) -> Point2<f32>
+pub fn round_point(point: Point2<f32>) -> Point2<f32>
 {
-	Point2::new(vec.x.round(), vec.y.round())
+	Point2::new(point.x.round(), point.y.round())
+}
+
+pub trait XYExt
+{
+	fn set_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>);
+	fn add_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>);
+}
+
+impl XYExt for Point3<f32>
+{
+	fn set_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>)
+	{
+		self.x = xy[0];
+		self.y = xy[1];
+	}
+
+	fn add_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>)
+	{
+		self.x += xy[0];
+		self.y += xy[1];
+	}
+}
+
+impl XYExt for Vector3<f32>
+{
+	fn set_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>)
+	{
+		self.x = xy[0];
+		self.y = xy[1];
+	}
+
+	fn add_xy(&mut self, xy: impl std::ops::Index<usize, Output = f32>)
+	{
+		self.x += xy[0];
+		self.y += xy[1];
+	}
 }
 
 pub fn sigmoid(x: f32) -> f32
@@ -150,9 +186,50 @@ pub fn save_config<T: Serialize>(file: &str, val: T) -> Result<()>
 	Ok(())
 }
 
+pub fn user_data_path(core: &Core) -> Result<path::PathBuf>
+{
+	let mut path_buf = path::PathBuf::new();
+	if cfg!(feature = "use_user_settings")
+	{
+		path_buf.push(
+			core.get_standard_path(StandardPath::UserSettings)
+				.map_err(|_| "Couldn't get standard path".to_string())?,
+		);
+	}
+	Ok(path_buf)
+}
+
+pub fn load_user_data<T: DeserializeOwned + Clone>(core: &Core, filename: &str)
+	-> Result<Option<T>>
+{
+	let mut path_buf = user_data_path(core)?;
+	path_buf.push(filename);
+	if path_buf.exists()
+	{
+		Ok(Some(load_config(path_buf.to_str().unwrap())?))
+	}
+	else
+	{
+		Ok(None)
+	}
+}
+
+pub fn save_user_data<T: Serialize>(core: &Core, filename: &str, options: &T) -> Result<()>
+{
+	let mut path_buf = user_data_path(core)?;
+	std::fs::create_dir_all(&path_buf).map_err(|_| "Couldn't create directory".to_string())?;
+	path_buf.push(filename);
+	save_config(path_buf.to_str().unwrap(), &options)
+}
+
 pub fn load_bitmap(core: &Core, file: &str) -> Result<Bitmap>
 {
 	Ok(Bitmap::load(&core, file).map_err(|_| format!("Couldn't load {}", file))?)
+}
+
+pub fn load_bitmap_indexed(core: &Core, file: &str) -> Result<Bitmap>
+{
+	Ok(Bitmap::load_indexed(&core, file).map_err(|_| format!("Couldn't load {}", file))?)
 }
 
 pub fn load_sample(audio: &AudioAddon, path: &str) -> Result<Sample>
@@ -338,6 +415,53 @@ pub fn intersect_segment_segment(
 	//~ dbg!(v1, v2, (v1 - v2).norm_squared());
 
 	(v1 - v2).norm_squared() < eps
+}
+
+pub fn draw_text(
+	core: &Core, font: &Font, color: Color, x: f32, y: f32, align: FontAlign, text: &str,
+) -> f32
+{
+	core.draw_text(font, color, x, y, align, text);
+	font.get_text_width(text) as f32
+}
+
+pub fn nice_float(f: f32, max_frac_digits: usize) -> String
+{
+	let res = format!("{:.1$}", f, max_frac_digits);
+	let res = if res.contains('.')
+	{
+		res.trim_end_matches('0').trim_end_matches('.').to_string()
+	}
+	else
+	{
+		res
+	};
+	if res.is_empty()
+	{
+		return "0".into();
+	}
+	else
+	{
+		return res;
+	}
+}
+
+#[test]
+fn nice_float_test()
+{
+	assert_eq!("15", nice_float(15., 2));
+	assert_eq!("0", nice_float(0., 2));
+	assert_eq!("0.1", nice_float(0.1, 2));
+	assert_eq!("0.11", nice_float(0.11, 2));
+	assert_eq!("-0.11", nice_float(-0.11, 2));
+	assert_eq!("0.5", nice_float(0.499999, 2));
+	assert_eq!("0.04", nice_float(0.04, 2));
+	assert_eq!("0.02", nice_float(0.019, 2));
+	assert_eq!("0.01", nice_float(0.009, 2));
+	assert_eq!("1.8", nice_float(100. * 0.018000001, 2));
+	assert_eq!("121", nice_float(120.99999, 2));
+	assert_eq!("100", nice_float(100., 2));
+	assert_eq!("100.1", nice_float(100.1, 2));
 }
 
 #[test]

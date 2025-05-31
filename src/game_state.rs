@@ -9,7 +9,7 @@ use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::{fmt, path};
+use std::{fmt, path, sync};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -40,14 +40,14 @@ impl Default for Options
 			width: 960,
 			height: 864,
 			play_music: true,
-			vsync_method: 2,
+			vsync_method: if cfg!(target_os = "windows") { 1 } else { 2 },
 			sfx_volume: 1.,
 			music_volume: 1.,
 			camera_speed: 4,
 			grab_mouse: false,
 			ui_scale: 1.,
 			frac_scale: true,
-			controls: controls::Controls::new(),
+			controls: controls::Controls::new_game(),
 		}
 	}
 }
@@ -78,6 +78,8 @@ pub struct GameState
 	bitmaps: HashMap<String, Bitmap>,
 	sprites: HashMap<String, sprite::Sprite>,
 	pub controls: controls::ControlsHandler,
+	pub game_ui_controls: controls::ControlsHandler,
+	pub menu_controls: controls::ControlsHandler,
 	pub track_mouse: bool,
 	pub mouse_pos: Point2<i32>,
 
@@ -87,43 +89,19 @@ pub struct GameState
 	pub buffer1: Option<Bitmap>,
 	pub buffer2: Option<Bitmap>,
 
+	pub basic_shader: sync::Weak<Shader>,
+
 	pub alpha: f32,
 }
 
 pub fn load_options(core: &Core) -> Result<Options>
 {
-	let mut path_buf = path::PathBuf::new();
-	if cfg!(feature = "use_user_settings")
-	{
-		path_buf.push(
-			core.get_standard_path(StandardPath::UserSettings)
-				.map_err(|_| "Couldn't get standard path".to_string())?,
-		);
-	}
-	path_buf.push("options.cfg");
-	if path_buf.exists()
-	{
-		utils::load_config(path_buf.to_str().unwrap())
-	}
-	else
-	{
-		Ok(Default::default())
-	}
+	Ok(utils::load_user_data(core, "options.cfg")?.unwrap_or_default())
 }
 
 pub fn save_options(core: &Core, options: &Options) -> Result<()>
 {
-	let mut path_buf = path::PathBuf::new();
-	if cfg!(feature = "use_user_settings")
-	{
-		path_buf.push(
-			core.get_standard_path(StandardPath::UserSettings)
-				.map_err(|_| "Couldn't get standard path".to_string())?,
-		);
-	}
-	std::fs::create_dir_all(&path_buf).map_err(|_| "Couldn't create directory".to_string())?;
-	path_buf.push("options.cfg");
-	utils::save_config(path_buf.to_str().unwrap(), &options)
+	utils::save_user_data(core, "options.cfg", options)
 }
 
 impl GameState
@@ -143,6 +121,10 @@ impl GameState
 			.map_err(|_| "Couldn't install keyboard".to_string())?;
 		core.install_mouse()
 			.map_err(|_| "Couldn't install mouse".to_string())?;
+		core.set_joystick_mappings("data/gamecontrollerdb.txt")
+			.map_err(|_| "Couldn't set joystick mappings".to_string())?;
+		core.install_joystick()
+			.map_err(|_| "Couldn't install joysticks".to_string())?;
 
 		let sfx = sfx::Sfx::new(options.sfx_volume, options.music_volume, &core)?;
 		//sfx.set_music_file("data/lemonade-sinus.xm");
@@ -169,8 +151,11 @@ impl GameState
 			buffer1: None,
 			buffer2: None,
 			controls: controls,
+			game_ui_controls: controls::ControlsHandler::new(controls::Controls::new_game_ui()),
+			menu_controls: controls::ControlsHandler::new(controls::Controls::new_menu()),
 			track_mouse: true,
 			mouse_pos: Point2::new(0, 0),
+			basic_shader: Default::default(),
 			alpha: 0.,
 		})
 	}

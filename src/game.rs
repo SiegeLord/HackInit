@@ -46,7 +46,6 @@ impl Game
 		&mut self, event: &Event, state: &mut game_state::GameState,
 	) -> Result<Option<game_state::NextScreen>>
 	{
-		state.controls.decode_event(event);
 		match *event
 		{
 			Event::MouseAxes { x, y, .. } =>
@@ -61,27 +60,25 @@ impl Game
 		}
 		if self.subscreens.is_empty()
 		{
-			let in_game_menu;
-			match *event
+			let mut in_game_menu = false;
+			let handled = false; // In case there's other in-game UI to handle this.
+			if state
+				.game_ui_controls
+				.get_action_state(controls::Action::UICancel)
+				> 0.5
 			{
-				Event::KeyDown {
-					keycode: KeyCode::Escape,
-					..
-				} =>
+				in_game_menu = true;
+			}
+			else if !handled
+			{
+				let res = self.map.input(event, state);
+				if let Ok(Some(game_state::NextScreen::InGameMenu)) = res
 				{
 					in_game_menu = true;
 				}
-				_ =>
+				else
 				{
-					let res = self.map.input(event, state);
-					if let Ok(Some(game_state::NextScreen::InGameMenu)) = res
-					{
-						in_game_menu = true;
-					}
-					else
-					{
-						return res;
-					}
+					return res;
 				}
 			}
 			if in_game_menu
@@ -89,7 +86,6 @@ impl Game
 				self.subscreens
 					.push(ui::SubScreen::InGameMenu(ui::InGameMenu::new(state)));
 				self.subscreens.reset_transition(state);
-				state.paused = true;
 			}
 		}
 		else
@@ -98,13 +94,16 @@ impl Game
 			{
 				match action
 				{
-					ui::Action::MainMenu => return Ok(Some(game_state::NextScreen::Menu)),
+					ui::Action::MainMenu =>
+					{
+						return Ok(Some(game_state::NextScreen::Menu));
+					}
 					_ => (),
 				}
 			}
 			if self.subscreens.is_empty()
 			{
-				state.paused = false;
+				state.controls.clear_action_states();
 			}
 		}
 		Ok(None)

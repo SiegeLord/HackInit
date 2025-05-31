@@ -7,16 +7,16 @@ authors = ["SiegeLord <slabode@aim.com>"]
 
 [dependencies]
 
-allegro-sys = { version="0.0.46" }
-allegro = { version="0.0.46" }
-allegro_dialog = { version="0.0.46" }
-allegro_image = { version="0.0.46" }
-allegro_font = { version="0.0.46" }
-allegro_ttf = { version="0.0.46" }
-allegro_acodec = { version="0.0.46" }
-allegro_audio = { version="0.0.46" }
-allegro_primitives = { version="0.0.46" }
-allegro_color = { version="0.0.46" }
+allegro-sys = { version="0.0.48" }
+allegro = { version="0.0.48", features = ["unstable"] }
+allegro_dialog = { version="0.0.48" }
+allegro_image = { version="0.0.48" }
+allegro_font = { version="0.0.48" }
+allegro_ttf = { version="0.0.48" }
+allegro_acodec = { version="0.0.48" }
+allegro_audio = { version="0.0.48" }
+allegro_primitives = { version="0.0.48" }
+allegro_color = { version="0.0.48" }
 
 #allegro-sys = { path = "/home/siege/Projects/RustAllegro/allegro-sys" }
 #allegro = { path = "/home/siege/Projects/RustAllegro/allegro" }
@@ -31,7 +31,7 @@ allegro_color = { version="0.0.46" }
 
 bimap = { version="0.6.2", features = ["serde"] }
 hecs = "0.10.5"
-slr_config = "0.0.21"
+slr_config = "0.0.22"
 #slr_config = { path = "/home/siege/Projects/SLRConfig/slr_config" }
 nalgebra = "0.31.1"
 rand = "0.8.5"
