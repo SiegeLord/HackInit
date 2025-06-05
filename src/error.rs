@@ -63,18 +63,6 @@ impl From<hecs::ComponentError> for Error
 	}
 }
 
-impl From<tiled::Error> for Error
-{
-	fn from(error: tiled::Error) -> Self
-	{
-		Self {
-			message: format!("{}", error),
-			inner: Some(Box::new(error)),
-			backtrace: Backtrace::capture(),
-		}
-	}
-}
-
 impl fmt::Display for Error
 {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
@@ -86,6 +74,18 @@ impl fmt::Display for Error
 		}
 		write!(f, "\nBacktrace:\n{}", self.backtrace)?;
 		Ok(())
+	}
+}
+
+impl From<gltf::Error> for Error
+{
+	fn from(error: gltf::Error) -> Self
+	{
+		Self {
+			message: format!("{}", error),
+			inner: Some(Box::new(error)),
+			backtrace: Backtrace::capture(),
+		}
 	}
 }
 

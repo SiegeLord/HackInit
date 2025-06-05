@@ -1,16 +1,17 @@
 use crate::error::Result;
 use crate::utils::DT;
-use crate::{astar, components as comps, controls, game_state, sprite, ui, utils};
+use crate::{astar, components as comps, controls, game_state, mesh, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use na::{
 	Isometry3, Matrix4, Perspective3, Point2, Point3, Quaternion, RealField, Rotation2, Rotation3,
-	Unit, Vector2, Vector3, Vector4,
+	Similarity3, Unit, Vector2, Vector3, Vector4,
 };
 use nalgebra as na;
 use rand::prelude::*;
 
 use std::collections::HashMap;
+use std::f32::consts::PI;
 
 pub struct Game
 {
@@ -109,7 +110,7 @@ impl Game
 		Ok(None)
 	}
 
-	pub fn draw(&mut self, state: &game_state::GameState) -> Result<()>
+	pub fn draw(&mut self, state: &mut game_state::GameState) -> Result<()>
 	{
 		if !self.subscreens.is_empty()
 		{
@@ -142,10 +143,12 @@ struct Map
 
 impl Map
 {
-	fn new(_state: &mut game_state::GameState) -> Result<Self>
+	fn new(state: &mut game_state::GameState) -> Result<Self>
 	{
 		let mut world = hecs::World::new();
 		spawn_obj(Point2::new(100., 100.), &mut world)?;
+		game_state::cache_mesh(state, "data/test_level_sprytile.glb")?;
+		game_state::cache_mesh(state, "data/sphere.glb")?;
 
 		Ok(Self { world: world })
 	}
@@ -200,21 +203,118 @@ impl Map
 		Ok(None)
 	}
 
-	fn draw(&mut self, state: &game_state::GameState) -> Result<()>
+	fn make_project(&self, state: &game_state::GameState) -> Perspective3<f32>
 	{
-		state.core.clear_to_color(Color::from_rgb_f(0., 0.0, 0.5));
+		utils::projection_transform(state.buffer_width(), state.buffer_height(), PI / 2.)
+	}
 
-		// Blob
-		for (_, position) in self.world.query::<&comps::Position>().iter()
+	fn camera_pos(&self) -> Point3<f32>
+	{
+		Point3::new(5., 2., -2.)
+	}
+
+	fn make_camera(&self) -> Isometry3<f32>
+	{
+		utils::make_camera(self.camera_pos(), Point3::new(0., 0., 0.))
+	}
+
+	fn draw(&mut self, state: &mut game_state::GameState) -> Result<()>
+	{
+		let project = self.make_project(state);
+		let camera = self.make_camera();
+
+		// Forward pass.
+		state
+			.core
+			.use_projection_transform(&utils::mat4_to_transform(project.to_homogeneous()));
+		state
+			.core
+			.use_transform(&utils::mat4_to_transform(camera.to_homogeneous()));
+		state
+			.deferred_renderer
+			.as_mut()
+			.unwrap()
+			.begin_forward_pass(&state.core)?;
+		state
+			.core
+			.use_shader(Some(&*state.forward_shader.upgrade().unwrap()))
+			.unwrap();
+
+		let shift = Isometry3::new(Vector3::zeros(), Vector3::zeros()).to_homogeneous();
+
+		state
+			.core
+			.use_transform(&utils::mat4_to_transform(camera.to_homogeneous() * shift));
+		state
+			.core
+			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
+			.ok();
+
+		let material_mapper = |_material: &mesh::Material, texture_name: &str| -> Result<&Bitmap> {
+			state.get_bitmap(texture_name)
+		};
+
+		state
+			.get_mesh("data/test_level_sprytile.glb")
+			.unwrap()
+			.draw(&state.core, &state.prim, material_mapper);
+
+		// Light pass.
+		state.deferred_renderer.as_mut().unwrap().begin_light_pass(
+			&state.core,
+			state.light_shader.clone(),
+			&utils::mat4_to_transform(project.to_homogeneous()),
+			self.camera_pos(),
+		)?;
+
+		let shift = Isometry3::new(Vector3::new(2., 2., -0.5), Vector3::zeros());
+		let intensity = 100.0_f32;
+		let transform = Similarity3::from_isometry(shift, 0.5 * intensity.sqrt());
+		let light_pos = transform.transform_point(&Point3::origin());
+
+		let (r, g, b) = (1., 0.1, 1.);
+
+		state
+			.core
+			.set_shader_uniform("light_color", &[[r, g, b, 1.0]][..])
+			.ok(); //.unwrap();
+		state
+			.core
+			.set_shader_uniform("light_pos", &[[light_pos.x, light_pos.y, light_pos.z]][..])
+			.ok(); //.unwrap();
+		state
+			.core
+			.set_shader_uniform("light_intensity", &[intensity][..])
+			.ok(); //.unwrap();
+
+		state.core.use_transform(&utils::mat4_to_transform(
+			camera.to_homogeneous() * transform.to_homogeneous(),
+		));
+
+		if let Ok(mesh) = state.get_mesh("data/sphere.glb")
 		{
-			state.prim.draw_filled_circle(
-				position.draw_pos(state.alpha).x,
-				position.draw_pos(state.alpha).y,
-				16.,
-				Color::from_rgb_f(1.0, 0.0, 1.0),
-			);
+			mesh.draw(&state.core, &state.prim, |_, s| state.get_bitmap(s));
 		}
 
+		// Final pass.
+		state.deferred_renderer.as_mut().unwrap().final_pass(
+			&state.core,
+			&state.prim,
+			state.final_shader.clone(),
+			state.buffer1.as_ref().unwrap(),
+		)?;
+
+		state
+			.core
+			.use_shader(Some(&*state.basic_shader.upgrade().unwrap()))
+			.unwrap();
+		unsafe {
+			gl::Disable(gl::CULL_FACE);
+		}
+		state.core.set_depth_test(None);
+		state
+			.core
+			.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::InverseAlpha);
 		Ok(())
 	}
 }

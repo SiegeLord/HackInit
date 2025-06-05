@@ -22,9 +22,9 @@ use na::{
 };
 use nalgebra as na;
 
-pub fn projection_transform(dw: f32, dh: f32) -> Perspective3<f32>
+pub fn projection_transform(dw: f32, dh: f32, fov: f32) -> Perspective3<f32>
 {
-	Perspective3::new(dw / dh, f32::pi() / 2., 1., 2000.)
+	Perspective3::new(dw / dh, fov, 1., 2000.)
 }
 
 pub fn mat4_to_transform(mat: Matrix4<f32>) -> Transform
@@ -40,12 +40,9 @@ pub fn mat4_to_transform(mat: Matrix4<f32>) -> Transform
 	trans
 }
 
-pub fn camera_project(x: f32, y: f32, z: f32, player_x: f32, player_z: f32) -> Isometry3<f32>
+pub fn make_camera(eye: Point3<f32>, target: Point3<f32>) -> Isometry3<f32>
 {
-	let eye = Point3::new(x, y, z);
-	let target = Point3::new(player_x, y, player_z);
-	let view = Isometry3::look_at_rh(&eye, &target, &Vector3::y());
-	view
+	Isometry3::look_at_rh(&eye, &target, &Vector3::y())
 }
 
 pub fn random_color(seed: u64, saturation: f32, value: f32) -> Color

@@ -7,10 +7,12 @@ mod astar;
 mod atlas;
 mod components;
 mod controls;
+mod deferred;
 mod error;
 mod game;
 mod game_state;
 mod menu;
+mod mesh;
 mod sfx;
 mod sprite;
 mod ui;
@@ -34,7 +36,7 @@ fn real_main() -> Result<()>
 {
 	let mut state = game_state::GameState::new()?;
 
-	let mut flags = OPENGL | RESIZABLE | PROGRAMMABLE_PIPELINE;
+	let mut flags = OPENGL | OPENGL_3_0 | PROGRAMMABLE_PIPELINE;
 
 	if state.options.fullscreen
 	{
@@ -50,11 +52,22 @@ fn real_main() -> Result<()>
 			DisplayOptionImportance::Suggest,
 		);
 	}
+	state.core.set_new_display_option(
+		DisplayOption::DepthSize,
+		16,
+		DisplayOptionImportance::Suggest,
+	);
 	let mut display = Display::new(&state.core, state.options.width, state.options.height)
 		.map_err(|_| "Couldn't create display".to_string())?;
 
+	gl_loader::init_gl();
+	gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
+
 	let scale_shader = utils::load_shader(&mut display, "data/scale")?;
+	state.forward_shader = utils::load_shader(&mut display, "data/forward")?;
 	state.basic_shader = utils::load_shader(&mut display, "data/basic")?;
+	state.light_shader = utils::load_shader(&mut display, "data/light")?;
+	state.final_shader = utils::load_shader(&mut display, "data/final")?;
 	state.resize_display(&display)?;
 
 	let timer = Timer::new(&state.core, utils::DT as f64)
@@ -130,8 +143,8 @@ fn real_main() -> Result<()>
 
 			match &mut cur_screen
 			{
-				Screen::Game(game) => game.draw(&state)?,
-				Screen::Menu(menu) => menu.draw(&state)?,
+				Screen::Game(game) => game.draw(&mut state)?,
+				Screen::Menu(menu) => menu.draw(&mut state)?,
 			}
 
 			if state.options.vsync_method == 2
