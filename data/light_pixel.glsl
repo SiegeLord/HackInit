@@ -6,6 +6,7 @@ uniform vec3 light_pos;
 uniform float light_intensity;
 uniform vec2 buffer_size;
 uniform vec3 camera_pos;
+uniform bool is_static;
 
 uniform sampler2D position_buffer;
 uniform sampler2D normal_buffer;
@@ -30,5 +31,9 @@ void main()
     float dist_sq = 10000. * dot(diff, diff);
     float dist_frac = 1 / (1 + dist_sq * dist_sq);
     //color = vec4(light_color.xyz, 0.);
-	color = dist_frac * vec4((light_color * diffuse_dot).xyz, specular_dot * float(material == 1.));
+    
+    if (is_static && material == STATIC_MATERIAL)
+	dist_frac = 0.;
+
+    color = dist_frac * vec4((light_color * diffuse_dot).xyz, specular_dot * 0.);
 }

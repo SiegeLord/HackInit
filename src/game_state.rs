@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{atlas, controls, deferred, mesh, sfx, sprite, utils};
+use crate::{atlas, controls, deferred, scene, sfx, sprite, utils};
 use allegro::*;
 use allegro_font::*;
 use allegro_image::*;
@@ -77,7 +77,7 @@ pub struct GameState
 	pub options: Options,
 	bitmaps: HashMap<String, Bitmap>,
 	sprites: HashMap<String, sprite::Sprite>,
-	meshes: HashMap<String, mesh::MultiMesh>,
+	scenes: HashMap<String, scene::Scene>,
 	pub controls: controls::ControlsHandler,
 	pub game_ui_controls: controls::ControlsHandler,
 	pub menu_controls: controls::ControlsHandler,
@@ -144,7 +144,7 @@ impl GameState
 			tick: 0,
 			bitmaps: HashMap::new(),
 			sprites: HashMap::new(),
-			meshes: HashMap::new(),
+			scenes: HashMap::new(),
 			font: font,
 			ttf: ttf,
 			sfx: sfx,
@@ -163,8 +163,8 @@ impl GameState
 			mouse_pos: Point2::new(0, 0),
 			basic_shader: Default::default(),
 			forward_shader: Default::default(),
-            light_shader: Default::default(),
-            final_shader: Default::default(),
+			light_shader: Default::default(),
+			final_shader: Default::default(),
 			deferred_renderer: None,
 			alpha: 0.,
 		})
@@ -227,7 +227,10 @@ impl GameState
 		{
 			self.buffer1 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
 			self.buffer2 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
-			self.deferred_renderer = Some(deferred::DeferredRenderer::new(&self.core, buffer_width, buffer_height)?);
+			self.deferred_renderer = Some(deferred::DeferredRenderer::new(
+				buffer_width,
+				buffer_height,
+			)?);
 		}
 
 		self.ui_font = Some(utils::load_ttf_font(
@@ -263,14 +266,14 @@ impl GameState
 		})
 	}
 
-	fn cache_mesh<'l>(&'l mut self, name: &str) -> Result<&'l mesh::MultiMesh>
+	fn cache_scene<'l>(&'l mut self, name: &str) -> Result<&'l scene::Scene>
 	{
-		let mesh = match self.meshes.entry(name.to_string())
+		let scene = match self.scenes.entry(name.to_string())
 		{
 			Entry::Occupied(o) => o.into_mut(),
-			Entry::Vacant(v) => v.insert(mesh::MultiMesh::load(name)?),
+			Entry::Vacant(v) => v.insert(scene::Scene::load(name)?),
 		};
-		Ok(mesh)
+		Ok(scene)
 	}
 
 	pub fn get_bitmap<'l>(&'l self, name: &str) -> Result<&'l Bitmap>
@@ -289,10 +292,10 @@ impl GameState
 			.ok_or_else(|| format!("{name} is not cached!"))?)
 	}
 
-	pub fn get_mesh<'l>(&'l self, name: &str) -> Result<&'l mesh::MultiMesh>
+	pub fn get_scene<'l>(&'l self, name: &str) -> Result<&'l scene::Scene>
 	{
 		Ok(self
-			.meshes
+			.scenes
 			.get(name)
 			.ok_or_else(|| format!("{name} is not cached!"))?)
 	}
@@ -303,15 +306,21 @@ impl GameState
 	}
 }
 
-pub fn cache_mesh(state: &mut GameState, name: &str) -> Result<()>
+pub fn cache_scene(state: &mut GameState, name: &str) -> Result<()>
 {
-	let mesh = state.cache_mesh(name)?;
+	let scene = state.cache_scene(name)?;
 	let mut textures = vec![];
-	for mesh in &mesh.meshes
+	for object in &scene.objects
 	{
-		if let Some(material) = mesh.material.as_ref()
+		if let scene::ObjectKind::MultiMesh { meshes } = &object.kind
 		{
-			textures.push(material.desc.texture.clone());
+			for mesh in meshes
+			{
+				if let Some(material) = mesh.material.as_ref()
+				{
+					textures.push(material.desc.texture.clone());
+				}
+			}
 		}
 	}
 	for texture in textures

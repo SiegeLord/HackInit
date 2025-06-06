@@ -37,7 +37,7 @@ nalgebra = "0.31.1"
 rand = "0.8.5"
 serde = "1.0.142"
 serde_derive = "1.0.142"
-gltf = "1.0.0"
+gltf = { version="1.0.0", features = ["KHR_lights_punctual"] }
 gl = "0.14.0"
 gl_loader = "0.1.2"
 rect_packer = "0.2.1"

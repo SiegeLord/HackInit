@@ -2,10 +2,11 @@
 in vec2 varying_texcoord;
 layout(location = 0) out vec4 out_color;
 
-uniform sampler2D al_tex; // Light buffer.
+uniform sampler2D al_tex; // Unused.
 uniform sampler2D position_buffer;
 uniform sampler2D normal_buffer;
 uniform sampler2D albedo_buffer;
+uniform sampler2D light_buffer;
 
 void main()
 {
@@ -14,9 +15,9 @@ void main()
     vec3 normal = normal_mat.xyz;
     float material = normal_mat.w;
     vec4 color = vec4(texture(albedo_buffer, varying_texcoord).rgb, 1);
-    vec4 light_color = texture(al_tex, varying_texcoord);
+    vec4 light_color = texture(light_buffer, varying_texcoord);
 
-    float fullbright = float(material == 2);
+    float fullbright = float(material == FULLBRIGHT_MATERIAL);
     vec3 final_light_color = (1 - fullbright) * light_color.xyz + fullbright;
 
     float specular = light_color.w;

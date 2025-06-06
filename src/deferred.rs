@@ -12,6 +12,7 @@ pub struct GBuffer
 	pub position_tex: u32,
 	pub normal_tex: u32,
 	pub albedo_tex: u32,
+	pub light_tex: u32,
 	pub depth_render_buffer: u32,
 }
 
@@ -23,6 +24,7 @@ impl GBuffer
 		let mut position_tex = 0;
 		let mut normal_tex = 0;
 		let mut albedo_tex = 0;
+		let mut light_tex = 0;
 		let mut depth_render_buffer = 0;
 
 		unsafe {
@@ -98,10 +100,34 @@ impl GBuffer
 				0,
 			);
 
+			gl::GenTextures(1, &mut light_tex);
+			gl::BindTexture(gl::TEXTURE_2D, light_tex);
+			gl::TexImage2D(
+				gl::TEXTURE_2D,
+				0,
+				gl::RGBA16F as i32,
+				buffer_width,
+				buffer_height,
+				0,
+				gl::RGBA,
+				gl::FLOAT,
+				std::ptr::null(),
+			);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+			gl::FramebufferTexture2D(
+				gl::FRAMEBUFFER,
+				gl::COLOR_ATTACHMENT3,
+				gl::TEXTURE_2D,
+				light_tex,
+				0,
+			);
+
 			let attachments = [
 				gl::COLOR_ATTACHMENT0,
 				gl::COLOR_ATTACHMENT1,
 				gl::COLOR_ATTACHMENT2,
+				gl::COLOR_ATTACHMENT3,
 			];
 			gl::DrawBuffers(attachments.len() as i32, attachments.as_ptr());
 			gl::GenRenderbuffers(1, &mut depth_render_buffer);
@@ -129,21 +155,9 @@ impl GBuffer
 			position_tex: position_tex,
 			normal_tex: normal_tex,
 			albedo_tex: albedo_tex,
+			light_tex: light_tex,
 			depth_render_buffer: depth_render_buffer,
 		})
-	}
-
-	pub fn bind(&self)
-	{
-		unsafe {
-			gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer);
-			let attachments = [
-				gl::COLOR_ATTACHMENT0,
-				gl::COLOR_ATTACHMENT1,
-				gl::COLOR_ATTACHMENT2,
-			];
-			gl::DrawBuffers(attachments.len() as i32, attachments.as_ptr());
-		}
 	}
 }
 
@@ -155,6 +169,7 @@ impl Drop for GBuffer
 			gl::DeleteTextures(1, &self.position_tex);
 			gl::DeleteTextures(1, &self.normal_tex);
 			gl::DeleteTextures(1, &self.albedo_tex);
+			gl::DeleteTextures(1, &self.light_tex);
 			gl::DeleteRenderbuffers(1, &self.depth_render_buffer);
 			gl::DeleteFramebuffers(1, &self.frame_buffer);
 		}
@@ -164,31 +179,39 @@ impl Drop for GBuffer
 pub struct DeferredRenderer
 {
 	pub g_buffer: GBuffer,
-	pub light_buffer: Bitmap,
+	pub width: i32,
+	pub height: i32,
 }
 
 impl DeferredRenderer
 {
-	pub fn new(core: &Core, width: i32, height: i32) -> Result<Self>
+	pub fn new(width: i32, height: i32) -> Result<Self>
 	{
 		Ok(Self {
-			light_buffer: Bitmap::new(&core, width, height)
-				.map_err(|_| "Couldn't create bitmap".to_string())?,
 			g_buffer: GBuffer::new(width, height)?,
+			width: width,
+			height: height,
 		})
 	}
 
 	pub fn begin_forward_pass(&mut self, core: &Core) -> Result<()>
 	{
-		self.g_buffer.bind();
 		unsafe {
+			gl::BindFramebuffer(gl::FRAMEBUFFER, self.g_buffer.frame_buffer);
+			let attachments = [
+				gl::COLOR_ATTACHMENT0,
+				gl::COLOR_ATTACHMENT1,
+				gl::COLOR_ATTACHMENT2,
+				gl::COLOR_ATTACHMENT3,
+			];
+			gl::DrawBuffers(attachments.len() as i32, attachments.as_ptr());
 			gl::Enable(gl::CULL_FACE);
 			gl::CullFace(gl::BACK);
 		}
 		core.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::Zero);
 		core.set_depth_test(Some(DepthFunction::Less));
 		core.clear_depth_buffer(1.);
-		core.clear_to_color(Color::from_rgb_f(0., 0., 0.));
+		core.clear_to_color(Color::from_rgba_f(0., 0., 0., 0.));
 		Ok(())
 	}
 
@@ -197,11 +220,14 @@ impl DeferredRenderer
 		camera_pos: Point3<f32>,
 	) -> Result<()>
 	{
-		core.set_target_bitmap(Some(&self.light_buffer));
+		unsafe {
+			gl::BindFramebuffer(gl::FRAMEBUFFER, self.g_buffer.frame_buffer);
+			let attachments = [gl::COLOR_ATTACHMENT3];
+			gl::DrawBuffers(attachments.len() as i32, attachments.as_ptr());
+		}
 
 		core.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::Zero);
 		// Last component is specular.
-		core.clear_to_color(Color::from_rgba_f(0.5, 0.5, 0.5, 0.));
 
 		core.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::One);
 		core.use_projection_transform(projection);
@@ -223,10 +249,7 @@ impl DeferredRenderer
 
 		core.set_shader_uniform(
 			"buffer_size",
-			&[[
-				self.light_buffer.get_width() as f32,
-				self.light_buffer.get_height() as f32,
-			]][..],
+			&[[self.width as f32, self.height as f32]][..],
 		)
 		.ok(); //.unwrap();
 
@@ -291,6 +314,7 @@ impl DeferredRenderer
 			.ok();
 		core.set_shader_uniform("normal_buffer", &[2_i32][..]).ok();
 		core.set_shader_uniform("albedo_buffer", &[3_i32][..]).ok();
+		core.set_shader_uniform("light_buffer", &[4_i32][..]).ok();
 		unsafe {
 			gl::Disable(gl::CULL_FACE);
 			gl::ActiveTexture(gl::TEXTURE1);
@@ -299,6 +323,8 @@ impl DeferredRenderer
 			gl::BindTexture(gl::TEXTURE_2D, self.g_buffer.normal_tex);
 			gl::ActiveTexture(gl::TEXTURE3);
 			gl::BindTexture(gl::TEXTURE_2D, self.g_buffer.albedo_tex);
+			gl::ActiveTexture(gl::TEXTURE4);
+			gl::BindTexture(gl::TEXTURE_2D, self.g_buffer.light_tex);
 		}
 		let vertices = [
 			Vertex {
@@ -336,7 +362,7 @@ impl DeferredRenderer
 		];
 		prim.draw_prim(
 			&vertices[..],
-			Some(&self.light_buffer),
+			Option::<&Bitmap>::None,
 			0,
 			4,
 			PrimType::TriangleFan,

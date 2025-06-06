@@ -12,7 +12,7 @@ mod error;
 mod game;
 mod game_state;
 mod menu;
-mod mesh;
+mod scene;
 mod sfx;
 mod sprite;
 mod ui;
@@ -64,8 +64,8 @@ fn real_main() -> Result<()>
 	gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
 
 	let scale_shader = utils::load_shader(&mut display, "data/scale")?;
-	state.forward_shader = utils::load_shader(&mut display, "data/forward")?;
 	state.basic_shader = utils::load_shader(&mut display, "data/basic")?;
+	state.forward_shader = utils::load_shader(&mut display, "data/forward")?;
 	state.light_shader = utils::load_shader(&mut display, "data/light")?;
 	state.final_shader = utils::load_shader(&mut display, "data/final")?;
 	state.resize_display(&display)?;

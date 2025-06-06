@@ -1,15 +1,24 @@
 use crate::error::Result;
 use crate::utils;
+use nalgebra::Point3;
 use serde_derive::{Deserialize, Serialize};
 
 use allegro::*;
 use allegro_primitives::*;
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[repr(i32)]
+pub enum MaterialKind
+{
+	Static = 0,
+	Dynamic = 1,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MaterialDesc
 {
 	pub texture: String,
-	pub material_id: i32,
+	pub material_kind: MaterialKind,
 }
 
 #[derive(Debug, Clone)]
@@ -28,21 +37,56 @@ pub struct Mesh
 }
 
 #[derive(Clone, Debug)]
-pub struct MultiMesh
+pub enum ObjectKind
 {
-	pub meshes: Vec<Mesh>,
+	MultiMesh
+	{
+		meshes: Vec<Mesh>
+	},
+	Light
+	{
+		intensity: f32, color: Color
+	},
 }
 
-impl MultiMesh
+#[derive(Clone, Debug)]
+pub struct Object
+{
+	pub position: Point3<f32>,
+	pub kind: ObjectKind,
+}
+
+#[derive(Clone, Debug)]
+pub struct Scene
+{
+	pub objects: Vec<Object>,
+}
+
+impl Scene
 {
 	pub fn load(gltf_file: &str) -> Result<Self>
 	{
 		let (document, buffers, _) = gltf::import(gltf_file)?;
-		let mut meshes = vec![];
+		let mut objects = vec![];
 		for node in document.nodes()
 		{
-			if let Some(mesh) = node.mesh()
+			let (translation, _rot, _scale) = node.transform().decomposed();
+			let position = Point3::new(translation[0], translation[1], translation[2]);
+			let mut object = None;
+			if let Some(light) = node.light()
 			{
+				let color = light.color();
+				object = Some(Object {
+					position: position,
+					kind: ObjectKind::Light {
+						intensity: light.intensity(),
+						color: Color::from_rgb_f(color[0], color[1], color[2]),
+					},
+				});
+			}
+			else if let Some(mesh) = node.mesh()
+			{
+				let mut meshes = vec![];
 				for prim in mesh.primitives()
 				{
 					let mut vtxs = vec![];
@@ -71,7 +115,7 @@ impl MultiMesh
 									u: uv[0],
 									v: 1. - uv[1],
 									u2: uv2[0],
-									v2: uv2[1],
+									v2: 1. - uv2[1],
 									nx: normal[0],
 									ny: normal[1],
 									nz: normal[2],
@@ -131,36 +175,50 @@ impl MultiMesh
 						material: material,
 					});
 				}
+				object = Some(Object {
+					position: position,
+					kind: ObjectKind::MultiMesh { meshes: meshes },
+				});
+			}
+			if let Some(object) = object
+			{
+				objects.push(object);
 			}
 		}
-		Ok(Self { meshes: meshes })
+		Ok(Self { objects: objects })
 	}
 
 	pub fn draw<'l, T: Fn(&Material, &str) -> Result<&'l Bitmap>>(
 		&self, core: &Core, prim: &PrimitivesAddon, bitmap_fn: T,
 	)
 	{
-		for mesh in self.meshes.iter()
+		for object in self.objects.iter()
 		{
-			core.set_shader_uniform(
-				"material",
-				&[mesh
-					.material
-					.as_ref()
-					.map(|m| m.desc.material_id as f32)
-					.unwrap_or(0.)][..],
-			)
-			.ok();
-			prim.draw_indexed_prim(
-				&mesh.vtxs[..],
-				mesh.material
-					.as_ref()
-					.and_then(|m| Some(bitmap_fn(&m, &m.desc.texture).unwrap())),
-				&mesh.idxs[..],
-				0,
-				mesh.idxs.len() as u32,
-				PrimType::TriangleList,
-			);
+			if let ObjectKind::MultiMesh { meshes } = &object.kind
+			{
+				for mesh in meshes
+				{
+					core.set_shader_uniform(
+						"material",
+						&[mesh
+							.material
+							.as_ref()
+							.map(|m| m.desc.material_kind as i32)
+							.unwrap_or(0)][..],
+					)
+					.ok();
+					prim.draw_indexed_prim(
+						&mesh.vtxs[..],
+						mesh.material
+							.as_ref()
+							.and_then(|m| Some(bitmap_fn(&m, &m.desc.texture).unwrap())),
+						&mesh.idxs[..],
+						0,
+						mesh.idxs.len() as u32,
+						PrimType::TriangleList,
+					);
+				}
+			}
 		}
 	}
 }

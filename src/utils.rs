@@ -24,7 +24,7 @@ use nalgebra as na;
 
 pub fn projection_transform(dw: f32, dh: f32, fov: f32) -> Perspective3<f32>
 {
-	Perspective3::new(dw / dh, fov, 1., 2000.)
+	Perspective3::new(dw / dh, fov, 0.01, 200.)
 }
 
 pub fn mat4_to_transform(mat: Matrix4<f32>) -> Transform
@@ -241,28 +241,49 @@ pub fn load_ttf_font(ttf: &TtfAddon, file: &str, size: i32) -> Result<Font>
 		.map_err(|_| format!("Couldn't load {}", file))?)
 }
 
+fn process_shader_source(source: String) -> String
+{
+	let replacements = [
+		("STATIC_MATERIAL", "0"),
+		("DYNAMIC_MATERIAL", "1"),
+		("FULLBRIGHT_MATERIAL", "2"),
+	];
+
+	let mut ret = source;
+	for (from, to) in replacements
+	{
+		ret = ret.replace(from, to);
+	}
+	ret
+}
+
 pub fn load_shader(disp: &mut Display, path: &str) -> Result<std::sync::Weak<Shader>>
 {
 	let shader = disp.create_shader(ShaderPlatform::GLSL).unwrap();
+	let vertex_path = format!("{path}_vertex.glsl");
+	let pixel_path = format!("{path}_pixel.glsl");
+
+	let mut vertex_source = read_to_string(&vertex_path)?;
+	let mut pixel_source = read_to_string(&pixel_path)?;
+
+	vertex_source = process_shader_source(vertex_source);
+	pixel_source = process_shader_source(pixel_source);
 
 	shader
 		.upgrade()
 		.unwrap()
-		.attach_shader_source(
-			ShaderType::Vertex,
-			Some(&read_to_string(&format!("{path}_vertex.glsl"))?),
-		)
-		.unwrap();
-
+		.attach_shader_source(ShaderType::Vertex, Some(&vertex_source))
+		.map_err(|e| format!("Error attaching {vertex_path}\n{e}"))?;
 	shader
 		.upgrade()
 		.unwrap()
-		.attach_shader_source(
-			ShaderType::Pixel,
-			Some(&read_to_string(&format!("{path}_pixel.glsl"))?),
-		)
-		.unwrap();
-	shader.upgrade().unwrap().build().unwrap();
+		.attach_shader_source(ShaderType::Pixel, Some(&pixel_source))
+		.map_err(|e| format!("Error attaching {pixel_path}\n{e}"))?;
+	shader
+		.upgrade()
+		.unwrap()
+		.build()
+		.map_err(|e| format!("Error compiling shader {path}\n{e}"))?;
 	Ok(shader)
 }
 
