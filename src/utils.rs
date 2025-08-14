@@ -257,9 +257,9 @@ fn process_shader_source(source: String) -> String
 	ret
 }
 
-pub fn load_shader(disp: &mut Display, path: &str) -> Result<std::sync::Weak<Shader>>
+pub fn load_shader(disp: &mut Display, path: &str) -> Result<Shader>
 {
-	let shader = disp.create_shader(ShaderPlatform::GLSL).unwrap();
+	let shader = Shader::new(disp, ShaderPlatform::GLSL).unwrap();
 	let vertex_path = format!("{path}_vertex.glsl");
 	let pixel_path = format!("{path}_pixel.glsl");
 
@@ -270,18 +270,12 @@ pub fn load_shader(disp: &mut Display, path: &str) -> Result<std::sync::Weak<Sha
 	pixel_source = process_shader_source(pixel_source);
 
 	shader
-		.upgrade()
-		.unwrap()
 		.attach_shader_source(ShaderType::Vertex, Some(&vertex_source))
 		.map_err(|e| format!("Error attaching {vertex_path}\n{e}"))?;
 	shader
-		.upgrade()
-		.unwrap()
 		.attach_shader_source(ShaderType::Pixel, Some(&pixel_source))
 		.map_err(|e| format!("Error attaching {pixel_path}\n{e}"))?;
 	shader
-		.upgrade()
-		.unwrap()
 		.build()
 		.map_err(|e| format!("Error compiling shader {path}\n{e}"))?;
 	Ok(shader)

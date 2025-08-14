@@ -23,7 +23,7 @@ pub struct Options
 	pub vsync_method: i32,
 	pub sfx_volume: f32,
 	pub music_volume: f32,
-	pub camera_speed: i32,
+	pub camera_speed: f32,
 	pub grab_mouse: bool,
 	pub ui_scale: f32,
 	pub frac_scale: bool,
@@ -36,14 +36,14 @@ impl Default for Options
 	fn default() -> Self
 	{
 		Self {
-			fullscreen: false,
+			fullscreen: true,
 			width: 960,
 			height: 864,
 			play_music: true,
 			vsync_method: if cfg!(target_os = "windows") { 1 } else { 2 },
 			sfx_volume: 1.,
 			music_volume: 1.,
-			camera_speed: 4,
+			camera_speed: 2.,
 			grab_mouse: false,
 			ui_scale: 1.,
 			frac_scale: true,
@@ -82,6 +82,7 @@ pub struct GameState
 	pub game_ui_controls: controls::ControlsHandler,
 	pub menu_controls: controls::ControlsHandler,
 	pub track_mouse: bool,
+	pub hide_mouse: bool,
 	pub mouse_pos: Point2<i32>,
 
 	pub draw_scale: f32,
@@ -90,11 +91,13 @@ pub struct GameState
 	pub buffer1: Option<Bitmap>,
 	pub buffer2: Option<Bitmap>,
 
-	pub basic_shader: sync::Weak<Shader>,
-	pub forward_shader: sync::Weak<Shader>,
-	pub light_shader: sync::Weak<Shader>,
-	pub final_shader: sync::Weak<Shader>,
+	pub basic_shader: Option<Shader>,
+	pub forward_shader: Option<Shader>,
+	pub light_shader: Option<Shader>,
+	pub final_shader: Option<Shader>,
 	pub deferred_renderer: Option<deferred::DeferredRenderer>,
+
+	pub _display: Option<Display>,
 
 	pub alpha: f32,
 }
@@ -114,7 +117,7 @@ impl GameState
 	pub fn new() -> Result<Self>
 	{
 		let core = Core::init()?;
-		core.set_app_name("HackInit");
+		core.set_app_name("Gula");
 		core.set_org_name("SiegeLord");
 
 		let options = load_options(&core)?;
@@ -160,12 +163,14 @@ impl GameState
 			game_ui_controls: controls::ControlsHandler::new(controls::Controls::new_game_ui()),
 			menu_controls: controls::ControlsHandler::new(controls::Controls::new_menu()),
 			track_mouse: true,
+			hide_mouse: false,
 			mouse_pos: Point2::new(0, 0),
-			basic_shader: Default::default(),
-			forward_shader: Default::default(),
-			light_shader: Default::default(),
-			final_shader: Default::default(),
+			basic_shader: None,
+			forward_shader: None,
+			light_shader: None,
+			final_shader: None,
 			deferred_renderer: None,
+			_display: None,
 			alpha: 0.,
 		})
 	}
@@ -195,12 +200,13 @@ impl GameState
 		self.ui_font.as_ref().unwrap()
 	}
 
-	pub fn resize_display(&mut self, display: &Display) -> Result<()>
+	pub fn resize_display(&mut self) -> Result<()>
 	{
 		const FIXED_BUFFER: bool = true;
 
 		let buffer_width;
 		let buffer_height;
+		let display = self._display.as_ref().unwrap();
 		if FIXED_BUFFER
 		{
 			buffer_width = 640;
@@ -228,6 +234,8 @@ impl GameState
 			self.buffer1 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
 			self.buffer2 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
 			self.deferred_renderer = Some(deferred::DeferredRenderer::new(
+				self._display.as_mut().unwrap(),
+				&self.prim,
 				buffer_width,
 				buffer_height,
 			)?);
@@ -271,9 +279,18 @@ impl GameState
 		let scene = match self.scenes.entry(name.to_string())
 		{
 			Entry::Occupied(o) => o.into_mut(),
-			Entry::Vacant(v) => v.insert(scene::Scene::load(name)?),
+			Entry::Vacant(v) => v.insert(scene::Scene::load(
+				&mut self._display.as_mut().unwrap(),
+				&self.prim,
+				name,
+			)?),
 		};
 		Ok(scene)
+	}
+
+	pub fn insert_scene(&mut self, name: &str, scene: scene::Scene)
+	{
+		self.scenes.insert(name.to_string(), scene);
 	}
 
 	pub fn get_bitmap<'l>(&'l self, name: &str) -> Result<&'l Bitmap>
@@ -304,6 +321,21 @@ impl GameState
 	{
 		self.tick as f64 * utils::DT as f64
 	}
+
+	pub fn set_display(&mut self, display: Display)
+	{
+		self._display = Some(display);
+	}
+
+	pub fn display(&self) -> &Display
+	{
+		self._display.as_ref().unwrap()
+	}
+
+	pub fn display_mut(&mut self) -> &mut Display
+	{
+		self._display.as_mut().unwrap()
+	}
 }
 
 pub fn cache_scene(state: &mut GameState, name: &str) -> Result<()>
@@ -319,6 +351,10 @@ pub fn cache_scene(state: &mut GameState, name: &str) -> Result<()>
 				if let Some(material) = mesh.material.as_ref()
 				{
 					textures.push(material.desc.texture.clone());
+					if !material.desc.lightmap.is_empty()
+					{
+						textures.push(material.desc.lightmap.clone());
+					}
 				}
 			}
 		}

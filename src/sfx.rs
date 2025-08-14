@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::utils;
-use nalgebra::{Point2, Vector2};
+use nalgebra::{Point2, Point3, UnitQuaternion, Vector2, Vector3};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
@@ -232,6 +232,41 @@ impl Sfx
 			)
 			.map_err(|_| "Couldn't play sound".to_string())?;
 		self.add_sample_instance(name, instance);
+		Ok(())
+	}
+
+	pub fn play_positional_sound_3d(
+		&mut self, name: &str, sound_pos: Point3<f32>, camera_pos: Point3<f32>,
+		camera_rot: UnitQuaternion<f32>, speed: f32,
+	) -> Result<()>
+	{
+		let diff = sound_pos - camera_pos;
+		let right = camera_rot * Vector3::x();
+		let horiz = -diff.dot(&right);
+
+		self.cache_sample(name)?;
+
+		let sample = self.samples.get(name).unwrap();
+
+		let dist_sq = diff.norm_squared();
+		let base_dist = 5.;
+		let volume = self.sfx_volume
+			* utils::clamp(self.sfx_volume * base_dist * base_dist / dist_sq, 0., 1.);
+		//println!("volume: {}", volume);
+		let pan = horiz / (horiz.powf(2.) + 2.0_f32.powf(2.)).sqrt();
+
+		let instance = self
+			.sink
+			.play_sample(
+				sample,
+				volume,
+				Some(pan),
+				thread_rng().gen_range(0.9..1.1) * speed,
+				Playmode::Once,
+			)
+			.map_err(|_| "Couldn't play sound".to_string())?;
+		self.add_sample_instance(name, instance);
+
 		Ok(())
 	}
 

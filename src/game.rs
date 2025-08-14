@@ -277,7 +277,7 @@ impl Map
 			.begin_forward_pass(&state.core)?;
 		state
 			.core
-			.use_shader(Some(&*state.forward_shader.upgrade().unwrap()))
+			.use_shader(Some(state.forward_shader.as_ref().unwrap()))
 			.unwrap();
 
 		let shift = Isometry3::new(Vector3::zeros(), Vector3::zeros()).to_homogeneous();
@@ -328,7 +328,7 @@ impl Map
 		// Light pass.
 		state.deferred_renderer.as_mut().unwrap().begin_light_pass(
 			&state.core,
-			state.light_shader.clone(),
+			state.light_shader.as_ref().unwrap(),
 			&utils::mat4_to_transform(project.to_homogeneous()),
 			self.camera_pos(),
 		)?;
@@ -375,13 +375,13 @@ impl Map
 		state.deferred_renderer.as_mut().unwrap().final_pass(
 			&state.core,
 			&state.prim,
-			state.final_shader.clone(),
+			state.final_shader.as_ref().unwrap(),
 			state.buffer1.as_ref().unwrap(),
 		)?;
 
 		state
 			.core
-			.use_shader(Some(&*state.basic_shader.upgrade().unwrap()))
+			.use_shader(Some(state.basic_shader.as_ref().unwrap()))
 			.unwrap();
 		unsafe {
 			gl::Disable(gl::CULL_FACE);

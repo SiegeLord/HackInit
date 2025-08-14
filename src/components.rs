@@ -21,7 +21,7 @@ pub struct Position
 #[derive(Debug, Clone)]
 pub struct Scene
 {
-    pub scene: String,
+	pub scene: String,
 }
 
 impl Position

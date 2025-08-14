@@ -14,11 +14,14 @@ pub struct GBuffer
 	pub albedo_tex: u32,
 	pub light_tex: u32,
 	pub depth_render_buffer: u32,
+	rect_vertex_buffer: VertexBuffer<Vertex>,
 }
 
 impl GBuffer
 {
-	pub fn new(buffer_width: i32, buffer_height: i32) -> Result<Self>
+	pub fn new(
+		display: &mut Display, prim: &PrimitivesAddon, buffer_width: i32, buffer_height: i32,
+	) -> Result<Self>
 	{
 		let mut frame_buffer = 0;
 		let mut position_tex = 0;
@@ -150,6 +153,53 @@ impl GBuffer
 			}
 			gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 		}
+
+		let vtx = Vertex {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			u: 0.0,
+			v: 0.0,
+			color: Color::from_rgb_f(1., 1., 1.),
+		};
+		let rect_vertex_buffer = VertexBuffer::new(
+			display,
+			&prim,
+			Some(&[
+				Vertex {
+					x: 0.0,
+					y: 0.0,
+					u: 0.0,
+					v: 1.0,
+					..vtx
+				},
+				Vertex {
+					x: buffer_width as f32,
+					y: 0.0,
+					u: 1.0,
+					v: 1.0,
+					..vtx
+				},
+				Vertex {
+					x: buffer_width as f32,
+					y: buffer_height as f32,
+					u: 1.0,
+					v: 0.0,
+					..vtx
+				},
+				Vertex {
+					x: 0.0,
+					y: buffer_height as f32,
+					u: 0.0,
+					v: 0.0,
+					..vtx
+				},
+			]),
+			4,
+			BUFFER_STATIC,
+		)
+		.unwrap();
+
 		Ok(Self {
 			frame_buffer: frame_buffer,
 			position_tex: position_tex,
@@ -157,6 +207,7 @@ impl GBuffer
 			albedo_tex: albedo_tex,
 			light_tex: light_tex,
 			depth_render_buffer: depth_render_buffer,
+			rect_vertex_buffer: rect_vertex_buffer,
 		})
 	}
 }
@@ -185,10 +236,12 @@ pub struct DeferredRenderer
 
 impl DeferredRenderer
 {
-	pub fn new(width: i32, height: i32) -> Result<Self>
+	pub fn new(
+		display: &mut Display, prim: &PrimitivesAddon, width: i32, height: i32,
+	) -> Result<Self>
 	{
 		Ok(Self {
-			g_buffer: GBuffer::new(width, height)?,
+			g_buffer: GBuffer::new(display, prim, width, height)?,
 			width: width,
 			height: height,
 		})
@@ -216,7 +269,7 @@ impl DeferredRenderer
 	}
 
 	pub fn begin_light_pass(
-		&mut self, core: &Core, light_shader: sync::Weak<Shader>, projection: &Transform,
+		&mut self, core: &Core, light_shader: &Shader, projection: &Transform,
 		camera_pos: Point3<f32>,
 	) -> Result<()>
 	{
@@ -239,8 +292,7 @@ impl DeferredRenderer
 			gl::CullFace(gl::FRONT);
 		}
 
-		core.use_shader(Some(&*light_shader.upgrade().unwrap()))
-			.unwrap();
+		core.use_shader(Some(light_shader)).unwrap();
 
 		core.set_shader_uniform("position_buffer", &[0_i32][..])
 			.ok(); //unwrap();
@@ -269,8 +321,7 @@ impl DeferredRenderer
 	}
 
 	pub fn final_pass(
-		&mut self, core: &Core, prim: &PrimitivesAddon, final_shader: sync::Weak<Shader>,
-		buffer: &Bitmap,
+		&mut self, core: &Core, prim: &PrimitivesAddon, final_shader: &Shader, buffer: &Bitmap,
 	) -> Result<()>
 	{
 		core.set_target_bitmap(Some(buffer));
@@ -307,8 +358,7 @@ impl DeferredRenderer
 		core.use_projection_transform(&utils::mat4_to_transform(ortho_mat));
 		core.use_transform(&Transform::identity());
 
-		core.use_shader(Some(&*final_shader.upgrade().unwrap()))
-			.unwrap();
+		core.use_shader(Some(final_shader)).unwrap();
 
 		core.set_shader_uniform("position_buffer", &[1_i32][..])
 			.ok();
@@ -326,42 +376,8 @@ impl DeferredRenderer
 			gl::ActiveTexture(gl::TEXTURE4);
 			gl::BindTexture(gl::TEXTURE_2D, self.g_buffer.light_tex);
 		}
-		let vertices = [
-			Vertex {
-				x: 0.,
-				y: 0.,
-				z: 0.,
-				u: 0.,
-				v: 1.,
-				color: Color::from_rgb_f(1.0, 1.0, 1.0),
-			},
-			Vertex {
-				x: buffer.get_width() as f32,
-				y: 0.,
-				z: 0.,
-				u: 1.,
-				v: 1.,
-				color: Color::from_rgb_f(1.0, 1.0, 1.0),
-			},
-			Vertex {
-				x: buffer.get_width() as f32,
-				y: buffer.get_height() as f32,
-				z: 0.,
-				u: 1.,
-				v: 0.,
-				color: Color::from_rgb_f(1.0, 1.0, 1.0),
-			},
-			Vertex {
-				x: 0.,
-				y: buffer.get_height() as f32,
-				z: 0.,
-				u: 0.,
-				v: 0.,
-				color: Color::from_rgb_f(1.0, 1.0, 1.0),
-			},
-		];
-		prim.draw_prim(
-			&vertices[..],
+		prim.draw_vertex_buffer(
+			&self.g_buffer.rect_vertex_buffer,
 			Option::<&Bitmap>::None,
 			0,
 			4,
