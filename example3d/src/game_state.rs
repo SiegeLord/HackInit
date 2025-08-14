@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{controls, deferred, scene, sfx, sprite, utils};
+use crate::{controls, deferred, sfx, sprite, utils};
 use allegro::*;
 use allegro_font::*;
 use allegro_image::*;
@@ -8,8 +8,9 @@ use allegro_ttf::*;
 use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
 use slhack::atlas;
-use std::collections::HashMap;
+use slhack::scene;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::{fmt, path, sync};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

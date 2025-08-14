@@ -21,6 +21,20 @@ impl Error
 		}
 	}
 
+	pub fn from_parts(parts: (String, Option<Box<dyn error::Error + 'static>>)) -> Self
+	{
+		Self {
+			message: parts.0,
+			inner: parts.1,
+			backtrace: Backtrace::capture(),
+		}
+	}
+
+	pub fn into_parts(self) ->(String, Option<Box<dyn error::Error + 'static>>)
+	{
+		(self.message, self.inner)
+	}
+
 	pub fn context(self, message: String) -> Self
 	{
 		Error::new(message, Some(Box::new(self)))
@@ -31,11 +45,15 @@ impl From<slhack::error::Error> for Error
 {
 	fn from(error: slhack::error::Error) -> Self
 	{
-		Self {
-			message: error.message,
-			inner: error.inner,
-			backtrace: Backtrace::capture(),
-		}
+		Self::from_parts(error.into_parts())
+	}
+}
+
+impl Into<slhack::error::Error> for Error
+{
+	fn into(self: Error) -> slhack::error::Error
+	{
+		slhack::error::Error::from_parts(self.into_parts())
 	}
 }
 
@@ -86,18 +104,6 @@ impl fmt::Display for Error
 		}
 		write!(f, "\nBacktrace:\n{}", self.backtrace)?;
 		Ok(())
-	}
-}
-
-impl From<gltf::Error> for Error
-{
-	fn from(error: gltf::Error) -> Self
-	{
-		Self {
-			message: format!("{}", error),
-			inner: Some(Box::new(error)),
-			backtrace: Backtrace::capture(),
-		}
 	}
 }
 

@@ -2,5 +2,6 @@ example3d/game.log
 example3d/allegro5.cfg
 example3d/target
 slhack/target
+slhack/Cargo.lock
 /*.png
 /*.jpg

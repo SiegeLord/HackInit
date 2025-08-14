@@ -11,7 +11,6 @@ mod error;
 mod game;
 mod game_state;
 mod menu;
-mod scene;
 mod sfx;
 mod sprite;
 mod ui;

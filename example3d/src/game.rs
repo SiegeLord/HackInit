@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::utils::DT;
-use crate::{components as comps, controls, game_state, scene, sprite, ui, utils};
+use crate::{components as comps, controls, game_state, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use na::{
@@ -9,6 +9,7 @@ use na::{
 };
 use nalgebra as na;
 use rand::prelude::*;
+use slhack::scene;
 
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -191,7 +192,7 @@ impl Map
 	}
 
 	fn logic(&mut self, state: &mut game_state::GameState)
-	-> Result<Option<game_state::NextScreen>>
+		-> Result<Option<game_state::NextScreen>>
 	{
 		let mut to_die = vec![];
 
@@ -292,7 +293,9 @@ impl Map
 
 		let material_mapper = |_material: &scene::Material<game_state::MaterialKind>,
 		                       texture_name: &str|
-		 -> Result<&Bitmap> { state.get_bitmap(texture_name) };
+		 -> slhack::error::Result<&Bitmap> {
+			state.get_bitmap(texture_name).map_err(Into::into)
+		};
 
 		state
 			.core
@@ -367,7 +370,7 @@ impl Map
 
 			if let Ok(scene) = state.get_scene("data/sphere.glb")
 			{
-				scene.draw(&state.core, &state.prim, |_, s| state.get_bitmap(s));
+				scene.draw(&state.core, &state.prim, |_, s| state.get_bitmap(s).map_err(Into::into));
 			}
 		}
 

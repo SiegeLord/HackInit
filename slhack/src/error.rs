@@ -5,9 +5,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Error
 {
-	pub message: String,
-	pub inner: Option<Box<dyn error::Error + 'static>>,
-	pub backtrace: Backtrace,
+	message: String,
+	inner: Option<Box<dyn error::Error + 'static>>,
+	backtrace: Backtrace,
 }
 
 impl Error
@@ -25,17 +25,19 @@ impl Error
 	{
 		Error::new(message, Some(Box::new(self)))
 	}
-}
 
-impl From<String> for Error
-{
-	fn from(error: String) -> Self
+	pub fn from_parts(parts: (String, Option<Box<dyn error::Error + 'static>>)) -> Self
 	{
 		Self {
-			message: error,
-			inner: None,
+			message: parts.0,
+			inner: parts.1,
 			backtrace: Backtrace::capture(),
 		}
+	}
+
+	pub fn into_parts(self) ->(String, Option<Box<dyn error::Error + 'static>>)
+	{
+		(self.message, self.inner)
 	}
 }
 
@@ -66,5 +68,29 @@ impl fmt::Debug for Error
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
 	{
 		write!(f, "{}", self)
+	}
+}
+
+impl From<String> for Error
+{
+	fn from(error: String) -> Self
+	{
+		Self {
+			message: error,
+			inner: None,
+			backtrace: Backtrace::capture(),
+		}
+	}
+}
+
+impl From<gltf::Error> for Error
+{
+	fn from(error: gltf::Error) -> Self
+	{
+		Self {
+			message: format!("{}", error),
+			inner: Some(Box::new(error)),
+			backtrace: Backtrace::capture(),
+		}
 	}
 }
