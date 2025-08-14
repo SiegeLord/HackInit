@@ -22,8 +22,8 @@ use allegro_dialog::*;
 use allegro_sys::*;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
-use std::rc::Rc;
 use slhack::utils;
+use std::rc::Rc;
 
 enum Screen
 {

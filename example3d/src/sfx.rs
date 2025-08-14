@@ -1,8 +1,8 @@
 use crate::error::Result;
 use crate::utils;
 use nalgebra::{Point2, Point3, UnitQuaternion, Vector2, Vector3};
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use allegro::*;
 use allegro_acodec::*;

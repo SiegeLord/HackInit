@@ -8,11 +8,28 @@ use allegro_ttf::*;
 use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
 use slhack::atlas;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::{fmt, path, sync};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[repr(i32)]
+pub enum MaterialKind
+{
+	Static = 0,
+	Dynamic = 1,
+	Fullbright = 2,
+}
+
+impl Into<i32> for MaterialKind
+{
+	fn into(self) -> i32
+	{
+		self as i32
+	}
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Options
@@ -53,6 +70,8 @@ impl Default for Options
 	}
 }
 
+type Scene = scene::Scene<MaterialKind>;
+
 #[derive(Debug)]
 pub enum NextScreen
 {
@@ -78,7 +97,7 @@ pub struct GameState
 	pub options: Options,
 	bitmaps: HashMap<String, Bitmap>,
 	sprites: HashMap<String, sprite::Sprite>,
-	scenes: HashMap<String, scene::Scene>,
+	scenes: HashMap<String, Scene>,
 	pub controls: controls::ControlsHandler,
 	pub game_ui_controls: controls::ControlsHandler,
 	pub menu_controls: controls::ControlsHandler,
@@ -275,12 +294,12 @@ impl GameState
 		})
 	}
 
-	fn cache_scene<'l>(&'l mut self, name: &str) -> Result<&'l scene::Scene>
+	fn cache_scene<'l>(&'l mut self, name: &str) -> Result<&'l Scene>
 	{
 		let scene = match self.scenes.entry(name.to_string())
 		{
 			Entry::Occupied(o) => o.into_mut(),
-			Entry::Vacant(v) => v.insert(scene::Scene::load(
+			Entry::Vacant(v) => v.insert(Scene::load(
 				&mut self._display.as_mut().unwrap(),
 				&self.prim,
 				name,
@@ -289,7 +308,7 @@ impl GameState
 		Ok(scene)
 	}
 
-	pub fn insert_scene(&mut self, name: &str, scene: scene::Scene)
+	pub fn insert_scene(&mut self, name: &str, scene: Scene)
 	{
 		self.scenes.insert(name.to_string(), scene);
 	}
@@ -310,7 +329,7 @@ impl GameState
 			.ok_or_else(|| format!("{name} is not cached!"))?)
 	}
 
-	pub fn get_scene<'l>(&'l self, name: &str) -> Result<&'l scene::Scene>
+	pub fn get_scene<'l>(&'l self, name: &str) -> Result<&'l Scene>
 	{
 		Ok(self
 			.scenes

@@ -1,6 +1,8 @@
 use crate::error::Result;
 use crate::utils;
 use nalgebra::{Point3, Vector3};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use slhack::astar;
 
@@ -8,41 +10,36 @@ use allegro::*;
 use allegro_primitives::*;
 
 use std::collections::HashMap;
+use std::fmt::Debug;
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-#[repr(i32)]
-pub enum MaterialKind
-{
-	Static = 0,
-	Dynamic = 1,
-	Fullbright = 2,
-}
+pub trait MaterialKind: Debug + Clone + Into<i32> {}
+impl<T: Debug + Clone + Into<i32>> MaterialKind for T {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MaterialDesc
+pub struct MaterialDesc<MaterialKindT: MaterialKind>
 {
 	pub texture: String,
 	#[serde(default)]
 	pub lightmap: String,
-	pub material_kind: MaterialKind,
+	pub material_kind: MaterialKindT,
 	#[serde(default)]
 	pub two_sided: bool,
 }
 
 #[derive(Debug, Clone)]
-pub struct Material
+pub struct Material<MaterialKindT: MaterialKind>
 {
 	pub name: String,
-	pub desc: MaterialDesc,
+	pub desc: MaterialDesc<MaterialKindT>,
 }
 
-pub struct Mesh
+pub struct Mesh<MaterialKindT: MaterialKind>
 {
-	pub vtxs: Vec<NormVertex>,
+	pub vtxs: Vec<MeshVertex>,
 	pub idxs: Vec<i32>,
-	pub vertex_buffer: VertexBuffer<NormVertex>,
+	pub vertex_buffer: VertexBuffer<MeshVertex>,
 	pub index_buffer: IndexBuffer<u32>,
-	pub material: Option<Material>,
+	pub material: Option<Material<MaterialKindT>>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,11 +49,11 @@ pub struct NavNode
 	pub neighbours: Vec<i32>,
 }
 
-pub enum ObjectKind
+pub enum ObjectKind<MaterialKindT: MaterialKind>
 {
 	MultiMesh
 	{
-		meshes: Vec<Mesh>,
+		meshes: Vec<Mesh<MaterialKindT>>,
 	},
 	NavMesh
 	{
@@ -70,19 +67,19 @@ pub enum ObjectKind
 	Empty,
 }
 
-pub struct Object
+pub struct Object<MaterialKindT: MaterialKind>
 {
 	pub name: String,
 	pub position: Point3<f32>,
-	pub kind: ObjectKind,
+	pub kind: ObjectKind<MaterialKindT>,
 }
 
-pub struct Scene
+pub struct Scene<MaterialKindT: MaterialKind>
 {
-	pub objects: Vec<Object>,
+	pub objects: Vec<Object<MaterialKindT>>,
 }
 
-impl Scene
+impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 {
 	pub fn load(display: &mut Display, prim: &PrimitivesAddon, gltf_file: &str) -> Result<Self>
 	{
@@ -140,7 +137,7 @@ impl Scene
 							for (((pos, uv), uv2), normal) in
 								pos_iter.zip(uv_iter).zip(uv2_iter).zip(normal_iter)
 							{
-								vtxs.push(NormVertex {
+								vtxs.push(MeshVertex {
 									x: pos[0],
 									y: pos[1],
 									z: pos[2],
@@ -159,7 +156,7 @@ impl Scene
 						{
 							for ((pos, uv), normal) in pos_iter.zip(uv_iter).zip(normal_iter)
 							{
-								vtxs.push(NormVertex {
+								vtxs.push(MeshVertex {
 									x: pos[0],
 									y: pos[1],
 									z: pos[2],
@@ -232,7 +229,7 @@ impl Scene
 		Ok(Self { objects: objects })
 	}
 
-	pub fn draw<'l, T: Fn(&Material, &str) -> Result<&'l Bitmap>>(
+	pub fn draw<'l, T: Fn(&Material<MaterialKindT>, &str) -> Result<&'l Bitmap>>(
 		&self, core: &Core, prim: &PrimitivesAddon, bitmap_fn: T,
 	)
 	{
@@ -247,7 +244,7 @@ impl Scene
 						&[mesh
 							.material
 							.as_ref()
-							.map(|m| m.desc.material_kind as i32)
+							.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
 							.unwrap_or(0)][..],
 					)
 					.ok();
@@ -269,7 +266,7 @@ impl Scene
 	pub fn clip_meshes(
 		&self, display: &mut Display, prim: &PrimitivesAddon,
 		keep_triangle_fn: impl Fn(Vector3<f32>) -> bool,
-	) -> Result<Scene>
+	) -> Result<Scene<MaterialKindT>>
 	{
 		let mut objects = vec![];
 
@@ -334,7 +331,7 @@ impl Scene
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct NormVertex
+pub struct MeshVertex
 {
 	pub x: f32,
 	pub y: f32,
@@ -349,29 +346,29 @@ pub struct NormVertex
 	pub color: Color,
 }
 
-unsafe impl VertexType for NormVertex
+unsafe impl VertexType for MeshVertex
 {
 	fn get_decl(prim: &PrimitivesAddon) -> VertexDecl
 	{
 		fn make_builder() -> std::result::Result<VertexDeclBuilder, ()>
 		{
-			VertexDeclBuilder::new(std::mem::size_of::<NormVertex>())
+			VertexDeclBuilder::new(std::mem::size_of::<MeshVertex>())
 				.pos(
 					VertexAttrStorage::F32_3,
-					memoffset::offset_of!(NormVertex, x),
+					memoffset::offset_of!(MeshVertex, x),
 				)?
 				.uv(
 					VertexAttrStorage::F32_2,
-					memoffset::offset_of!(NormVertex, u),
+					memoffset::offset_of!(MeshVertex, u),
 				)?
-				.color(memoffset::offset_of!(NormVertex, color))?
+				.color(memoffset::offset_of!(MeshVertex, color))?
 				.user_attr(
 					VertexAttrStorage::F32_3,
-					memoffset::offset_of!(NormVertex, nx),
+					memoffset::offset_of!(MeshVertex, nx),
 				)?
 				.user_attr(
 					VertexAttrStorage::F32_2,
-					memoffset::offset_of!(NormVertex, u2),
+					memoffset::offset_of!(MeshVertex, u2),
 				)
 		}
 
@@ -484,8 +481,8 @@ impl astar::Node for NavNode
 }
 
 fn create_buffers(
-	display: &mut Display, prim: &PrimitivesAddon, vtxs: &[NormVertex], idxs: &[i32],
-) -> Result<(VertexBuffer<NormVertex>, IndexBuffer<u32>)>
+	display: &mut Display, prim: &PrimitivesAddon, vtxs: &[MeshVertex], idxs: &[i32],
+) -> Result<(VertexBuffer<MeshVertex>, IndexBuffer<u32>)>
 {
 	let vertex_buffer =
 		VertexBuffer::new(display, prim, Some(&vtxs), vtxs.len() as u32, BUFFER_STATIC)

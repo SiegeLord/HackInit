@@ -191,7 +191,7 @@ impl Map
 	}
 
 	fn logic(&mut self, state: &mut game_state::GameState)
-		-> Result<Option<game_state::NextScreen>>
+	-> Result<Option<game_state::NextScreen>>
 	{
 		let mut to_die = vec![];
 
@@ -290,7 +290,7 @@ impl Map
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
 
-		let material_mapper = |_material: &scene::Material,
+		let material_mapper = |_material: &scene::Material<game_state::MaterialKind>,
 		                       texture_name: &str|
 		 -> Result<&Bitmap> { state.get_bitmap(texture_name) };
 
