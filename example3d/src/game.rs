@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::utils::DT;
-use crate::{astar, components as comps, controls, game_state, scene, sprite, ui, utils};
+use crate::{components as comps, controls, game_state, scene, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use na::{

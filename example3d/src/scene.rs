@@ -1,8 +1,8 @@
-use crate::astar;
 use crate::error::Result;
 use crate::utils;
 use nalgebra::{Point3, Vector3};
 use serde_derive::{Deserialize, Serialize};
+use slhack::astar;
 
 use allegro::*;
 use allegro_primitives::*;

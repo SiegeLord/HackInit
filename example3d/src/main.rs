@@ -4,8 +4,6 @@
 #![allow(dead_code)]
 #![allow(clippy::all)]
 
-mod astar;
-mod atlas;
 mod components;
 mod controls;
 mod deferred;
@@ -17,7 +15,6 @@ mod scene;
 mod sfx;
 mod sprite;
 mod ui;
-mod utils;
 
 use crate::error::Result;
 use allegro::*;
@@ -26,6 +23,7 @@ use allegro_sys::*;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use std::rc::Rc;
+use slhack::utils;
 
 enum Screen
 {

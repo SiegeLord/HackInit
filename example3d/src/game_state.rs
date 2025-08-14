@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{atlas, controls, deferred, scene, sfx, sprite, utils};
+use crate::{controls, deferred, scene, sfx, sprite, utils};
 use allegro::*;
 use allegro_font::*;
 use allegro_image::*;
@@ -7,6 +7,7 @@ use allegro_primitives::*;
 use allegro_ttf::*;
 use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
+use slhack::atlas;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::{fmt, path, sync};
@@ -109,7 +110,7 @@ pub fn load_options(core: &Core) -> Result<Options>
 
 pub fn save_options(core: &Core, options: &Options) -> Result<()>
 {
-	utils::save_user_data(core, "options.cfg", options)
+	Ok(utils::save_user_data(core, "options.cfg", options)?)
 }
 
 impl GameState

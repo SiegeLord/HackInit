@@ -5,9 +5,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Error
 {
-	message: String,
-	inner: Option<Box<dyn error::Error + 'static>>,
-	backtrace: Backtrace,
+	pub message: String,
+	pub inner: Option<Box<dyn error::Error + 'static>>,
+	pub backtrace: Backtrace,
 }
 
 impl Error
@@ -27,18 +27,6 @@ impl Error
 	}
 }
 
-impl From<slhack::error::Error> for Error
-{
-	fn from(error: slhack::error::Error) -> Self
-	{
-		Self {
-			message: error.message,
-			inner: error.inner,
-			backtrace: Backtrace::capture(),
-		}
-	}
-}
-
 impl From<String> for Error
 {
 	fn from(error: String) -> Self
@@ -46,30 +34,6 @@ impl From<String> for Error
 		Self {
 			message: error,
 			inner: None,
-			backtrace: Backtrace::capture(),
-		}
-	}
-}
-
-impl From<hecs::NoSuchEntity> for Error
-{
-	fn from(error: hecs::NoSuchEntity) -> Self
-	{
-		Self {
-			message: format!("{}", error),
-			inner: Some(Box::new(error)),
-			backtrace: Backtrace::capture(),
-		}
-	}
-}
-
-impl From<hecs::ComponentError> for Error
-{
-	fn from(error: hecs::ComponentError) -> Self
-	{
-		Self {
-			message: format!("{}", error),
-			inner: Some(Box::new(error)),
 			backtrace: Backtrace::capture(),
 		}
 	}
@@ -86,18 +50,6 @@ impl fmt::Display for Error
 		}
 		write!(f, "\nBacktrace:\n{}", self.backtrace)?;
 		Ok(())
-	}
-}
-
-impl From<gltf::Error> for Error
-{
-	fn from(error: gltf::Error) -> Self
-	{
-		Self {
-			message: format!("{}", error),
-			inner: Some(Box::new(error)),
-			backtrace: Backtrace::capture(),
-		}
 	}
 }
 

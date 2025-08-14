@@ -521,10 +521,10 @@ impl Widget
 	{
 		match self
 		{
-			Widget::Button(ref mut w) => w.loc = loc,
-			Widget::Label(ref mut w) => w.loc = loc,
-			Widget::Slider(ref mut w) => w.loc = loc,
-			Widget::Toggle(ref mut w) => w.loc = loc,
+			Widget::Button(w) => w.loc = loc,
+			Widget::Label(w) => w.loc = loc,
+			Widget::Slider(w) => w.loc = loc,
+			Widget::Toggle(w) => w.loc = loc,
 		}
 	}
 
@@ -543,10 +543,10 @@ impl Widget
 	{
 		match self
 		{
-			Widget::Button(ref mut w) => w.selected = selected,
+			Widget::Button(w) => w.selected = selected,
 			Widget::Label(_) => (),
-			Widget::Slider(ref mut w) => w.selected = selected,
-			Widget::Toggle(ref mut w) => w.selected = selected,
+			Widget::Slider(w) => w.selected = selected,
+			Widget::Toggle(w) => w.selected = selected,
 		}
 	}
 

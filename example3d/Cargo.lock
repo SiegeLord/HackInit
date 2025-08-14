@@ -24,9 +24,9 @@ dependencies = [
  "memoffset",
  "nalgebra",
  "rand",
- "rect_packer",
  "serde",
  "serde_derive",
+ "slhack",
  "slr_config",
 ]
 
@@ -776,6 +776,33 @@ name = "simd-adler32"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "238abfbb77c1915110ad968465608b68e869e0772622c9656714e73e5a1a522f"
+
+[[package]]
+name = "slhack"
+version = "0.1.0"
+dependencies = [
+ "allegro",
+ "allegro-sys",
+ "allegro_acodec",
+ "allegro_audio",
+ "allegro_color",
+ "allegro_dialog",
+ "allegro_font",
+ "allegro_image",
+ "allegro_primitives",
+ "allegro_ttf",
+ "bimap",
+ "gl",
+ "gl_loader",
+ "gltf",
+ "memoffset",
+ "nalgebra",
+ "rand",
+ "rect_packer",
+ "serde",
+ "serde_derive",
+ "slr_config",
+]
 
 [[package]]
 name = "slr_config"

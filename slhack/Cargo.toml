@@ -1,13 +1,11 @@
 [package]
-name = "Example3D"
+name = "slhack"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
 authors = ["SiegeLord <slabode@aim.com>"]
 
 [dependencies]
-
-slhack = { path = "../slhack" }
 
 allegro-sys = { version="0.0.49" }
 allegro = { version="0.0.49", features = ["unstable"] }
@@ -32,7 +30,6 @@ allegro_color = { version="0.0.49" }
 #allegro_color = { path = "/home/siege/Projects/RustAllegro/allegro_color" }
 
 bimap = { version="0.6.2", features = ["serde"] }
-hecs = "0.10.5"
 slr_config = "0.0.22"
 #slr_config = { path = "/home/siege/Projects/SLRConfig/slr_config" }
 nalgebra = "0.31.1"
@@ -42,6 +39,7 @@ serde_derive = "1.0.142"
 gltf = { version="1.0.0", features = ["KHR_lights_punctual"] }
 gl = "0.14.0"
 gl_loader = "0.1.2"
+rect_packer = "0.2.1"
 memoffset = "0.9.1"
 
 [profile.release]

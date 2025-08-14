@@ -4,8 +4,6 @@ use crate::utils;
 use allegro::*;
 use allegro_sys::*;
 use nalgebra::Point2;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone)]
 pub struct AtlasBitmap
@@ -88,7 +86,6 @@ impl Page
 pub struct Atlas
 {
 	pub pages: Vec<Page>,
-	bitmaps: HashMap<String, AtlasBitmap>,
 	page_size: i32,
 }
 
@@ -98,7 +95,6 @@ impl Atlas
 	{
 		Self {
 			pages: vec![],
-			bitmaps: HashMap::new(),
 			page_size: page_size,
 		}
 	}
@@ -117,7 +113,7 @@ impl Atlas
 		let id = self.pages.len() - 1;
 		if let Some(atlas_bitmap) = self.pages.last_mut().unwrap().insert(core, bitmap, id)
 		{
-			return Ok(atlas_bitmap);
+			Ok(atlas_bitmap)
 		}
 		else
 		{

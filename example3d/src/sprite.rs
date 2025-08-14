@@ -1,9 +1,10 @@
 use crate::error::Result;
-use crate::{atlas, game_state, utils};
+use crate::{game_state, utils};
 use allegro::*;
 use na::{Point2, Vector2};
 use nalgebra as na;
 use serde_derive::{Deserialize, Serialize};
+use slhack::atlas;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
