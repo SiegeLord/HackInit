@@ -1,8 +1,8 @@
 use crate::error::Result;
 use crate::utils;
-use nalgebra::{Point2, Point3, UnitQuaternion, Vector2, Vector3};
-use std::collections::HashMap;
+use nalgebra::{Point2, Point3, UnitQuaternion, Vector3};
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use allegro::*;
 use allegro_acodec::*;
@@ -16,6 +16,7 @@ const FADEOUT_TIME: f64 = 0.1;
 pub struct Sfx
 {
 	audio: AudioAddon,
+	#[allow(dead_code)]
 	acodec: AcodecAddon,
 	sink: Sink,
 	music_stream: Option<AudioStream>,
