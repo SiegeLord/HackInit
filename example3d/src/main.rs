@@ -6,7 +6,6 @@
 
 mod components;
 mod controls;
-mod deferred;
 mod error;
 mod game;
 mod game_state;

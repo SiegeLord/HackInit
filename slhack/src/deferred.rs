@@ -1,7 +1,6 @@
 use crate::error::Result;
 use crate::utils;
 use nalgebra::{Matrix4, Point3};
-use std::sync;
 
 use allegro::*;
 use allegro_primitives::*;
