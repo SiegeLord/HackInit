@@ -1,19 +1,19 @@
-use na::Point2;
-use nalgebra as na;
+// TODO: Clean up, this should just be a single function.
+use nalgebra::Point3;
 
 #[derive(Copy, Clone, Debug)]
 pub struct NodeAndScore
 {
-	pos: Point2<i32>,
+	idx: i32,
 	f_score: f32,
 }
 
 impl NodeAndScore
 {
-	pub fn new(pos: Point2<i32>, f_score: f32) -> NodeAndScore
+	pub fn new(idx: i32, f_score: f32) -> NodeAndScore
 	{
 		NodeAndScore {
-			pos: pos,
+			idx: idx,
 			f_score: f_score,
 		}
 	}
@@ -46,56 +46,66 @@ impl PartialEq for NodeAndScore
 
 impl Eq for NodeAndScore {}
 
-pub struct AStarContext
+pub trait Node
 {
-	open_set: std::collections::BinaryHeap<NodeAndScore>,
-	came_from: Vec<isize>,
-	cost: Vec<f32>,
-	size: usize,
+	fn get_pos(&self) -> Point3<f32>;
+	fn get_neighbours(&self) -> &[i32];
 }
 
-impl AStarContext
+pub struct AStarContext<'n, NodeT>
 {
-	pub fn new(size: usize) -> AStarContext
+	open_set: std::collections::BinaryHeap<NodeAndScore>,
+	came_from: Vec<i32>,
+	cost: Vec<f32>,
+	nodes: &'n [NodeT],
+}
+
+impl<'n, NodeT: Node> AStarContext<'n, NodeT>
+{
+	pub fn new(nodes: &'n [NodeT]) -> Self
 	{
-		let len = size * size;
 		AStarContext {
 			open_set: std::collections::BinaryHeap::new(),
-			came_from: vec![-1; len],
-			cost: vec![0.; len],
-			size: size,
+			came_from: vec![-1; nodes.len()],
+			cost: vec![0.; nodes.len()],
+			nodes: nodes,
 		}
 	}
 
-	fn heuristic(&self, from: Point2<i32>, to: Point2<i32>) -> f32
+	fn heuristic(&self, from: i32, to: i32) -> f32
 	{
-		let dx = (from.x - to.x) as f32;
-		let dy = (from.y - to.y) as f32;
-		(dx * dx + dy * dy).sqrt()
+		(self.nodes[from as usize].get_pos() - self.nodes[to as usize].get_pos()).norm()
 	}
 
-	fn map_to_idx(&self, pos: Point2<i32>) -> Option<usize>
+	fn pos_to_idx(&self, pos: Point3<f32>) -> Option<i32>
 	{
-		if pos.x < 0 || pos.y < 0 || pos.x >= self.size as i32 || pos.y >= self.size as i32
+		let mut best_idx = None;
+		let mut best_distance = std::f32::INFINITY;
+		for (i, node) in self.nodes.iter().enumerate()
 		{
-			None
+			let distance = (pos - node.get_pos()).norm();
+			if distance < best_distance
+			{
+				best_idx = Some(i as i32);
+				best_distance = distance;
+			}
 		}
-		else
-		{
-			Some((pos.y * self.size as i32 + pos.x) as usize)
-		}
+		best_idx
 	}
 
-	fn idx_to_map(&self, idx: usize) -> Point2<i32>
+	fn idx_to_pos(&self, idx: i32) -> Point3<f32>
 	{
-		Point2::new((idx % self.size) as i32, (idx / self.size) as i32)
+		self.nodes[idx as usize].get_pos()
 	}
 
 	/// N.B. this returns the path in reverse order.
-	pub fn solve<S: Fn(Point2<i32>) -> bool, C: Fn(Point2<i32>) -> f32>(
-		&mut self, from: Point2<i32>, to: Point2<i32>, is_solid: S, cost_fn: C,
-	) -> Vec<Point2<i32>>
+	pub fn solve<C: Fn(&NodeT, &NodeT) -> f32>(
+		&mut self, from: Point3<f32>, to: Point3<f32>, cost_fn: C,
+	) -> Vec<Point3<f32>>
 	{
+		let from_idx = self.pos_to_idx(from).unwrap();
+		let to_idx = self.pos_to_idx(to).unwrap();
+
 		self.open_set.clear();
 		for i in 0..self.came_from.len()
 		{
@@ -103,22 +113,22 @@ impl AStarContext
 			self.cost[i] = 1e6;
 		}
 
-		let from_idx = self.map_to_idx(from).unwrap();
-		self.cost[from_idx] = self.heuristic(from, from);
-		self.came_from[from_idx] = from_idx as isize;
-		self.open_set
-			.push(NodeAndScore::new(from, self.heuristic(from, from)));
+		self.cost[from_idx as usize] = self.heuristic(from_idx, from_idx);
+		self.came_from[from_idx as usize] = from_idx as i32;
+		self.open_set.push(NodeAndScore::new(
+			from_idx,
+			self.heuristic(from_idx, from_idx),
+		));
 
-		let mut best_score_so_far = self.heuristic(from, to);
+		let mut best_score_so_far = self.heuristic(from_idx, to_idx);
 		let mut best_idx_so_far = -1;
 
-		let to_idx = self.map_to_idx(to).unwrap();
+		let to_idx = self.pos_to_idx(to).unwrap();
 		while !self.open_set.is_empty()
 		{
 			let cur = self.open_set.pop().unwrap();
 			//~ println!("Trying {:?}", cur);
-			let cur_idx = self.map_to_idx(cur.pos).unwrap();
-			if cur_idx == to_idx
+			if cur.idx == to_idx
 			{
 				let mut cur_idx = to_idx;
 				let mut path = vec![to];
@@ -126,8 +136,8 @@ impl AStarContext
 				loop
 				{
 					//~ println!("Reconstructing: {}", cur_idx);
-					cur_idx = self.came_from[cur_idx] as usize;
-					path.push(self.idx_to_map(cur_idx));
+					cur_idx = self.came_from[cur_idx as usize];
+					path.push(self.idx_to_pos(cur_idx));
 					if cur_idx == from_idx
 					{
 						//~ path.reverse();
@@ -138,44 +148,39 @@ impl AStarContext
 				}
 			}
 
-			for (dx, dy, cost) in &[(-1, 0, 1.), (1, 0, 1.), (0, -1, 1.), (0, 1, 1.)]
+			for &next_idx in self.nodes[cur.idx as usize].get_neighbours()
 			{
-				let next = Point2::new(cur.pos.x + dx, cur.pos.y + dy);
-				if let Some(next_idx) = self.map_to_idx(next)
+				let new_cost = self.cost[cur.idx as usize]
+					+ cost_fn(
+						&self.nodes[cur.idx as usize],
+						&self.nodes[next_idx as usize],
+					);
+				if new_cost < self.cost[next_idx as usize]
 				{
-					if is_solid(next)
+					let new_heuristic = self.heuristic(next_idx, to_idx);
+					if new_heuristic < best_score_so_far
 					{
-						continue;
+						best_score_so_far = new_heuristic;
+						best_idx_so_far = next_idx;
 					}
 
-					let new_cost = self.cost[cur_idx] + cost + cost_fn(next);
-					if new_cost < self.cost[next_idx]
-					{
-						let new_heuristic = self.heuristic(next, to);
-						if new_heuristic < best_score_so_far
-						{
-							best_score_so_far = new_heuristic;
-							best_idx_so_far = next_idx as isize;
-						}
-
-						self.came_from[next_idx] = cur_idx as isize;
-						self.cost[next_idx] = new_cost;
-						self.open_set
-							.push(NodeAndScore::new(next, new_cost + new_heuristic));
-					}
+					self.came_from[next_idx as usize] = cur.idx;
+					self.cost[next_idx as usize] = new_cost;
+					self.open_set
+						.push(NodeAndScore::new(next_idx, new_cost + new_heuristic));
 				}
 			}
 		}
 		if best_idx_so_far > -1
 		{
-			let mut cur_idx = best_idx_so_far as usize;
-			let mut path = vec![self.idx_to_map(cur_idx)];
+			let mut cur_idx = best_idx_so_far;
+			let mut path = vec![self.idx_to_pos(cur_idx)];
 			//~ println!("Start {:?} {:?}", from, to);
 			loop
 			{
 				//~ println!("Reconstructing: {}", cur_idx);
-				cur_idx = self.came_from[cur_idx] as usize;
-				path.push(self.idx_to_map(cur_idx));
+				cur_idx = self.came_from[cur_idx as usize];
+				path.push(self.idx_to_pos(cur_idx));
 				if cur_idx == from_idx
 				{
 					//~ path.reverse();
