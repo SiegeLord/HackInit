@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "HackInit"
+name = "Example3D"
 version = "0.1.0"
 dependencies = [
  "allegro",

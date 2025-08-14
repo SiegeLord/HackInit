@@ -1,6 +1,5 @@
-game.log
-allegro5.cfg
-target
-data/raw
+example3d/game.log
+example3d/allegro5.cfg
+example3d/target
 /*.png
 /*.jpg
