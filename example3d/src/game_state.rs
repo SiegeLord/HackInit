@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{controls, sprite, utils};
+use crate::{controls, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use allegro_image::*;
@@ -9,7 +9,7 @@ use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
 use slhack::{atlas, deferred, scene, sfx};
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::{fmt, path, sync};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -31,6 +31,36 @@ impl Into<i32> for MaterialKind
 	}
 }
 
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
+pub enum Action
+{
+	Move,
+}
+
+impl controls::Action for Action
+{
+	fn to_str(&self) -> &'static str
+	{
+		match self
+		{
+			Action::Move => "Move",
+		}
+	}
+}
+
+pub fn new_game_controls() -> controls::Controls<Action>
+{
+	let mut action_to_inputs = BTreeMap::new();
+	action_to_inputs.insert(
+		Action::Move,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Space)),
+			None,
+		],
+	);
+	controls::Controls::new(action_to_inputs)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Options
 {
@@ -46,7 +76,7 @@ pub struct Options
 	pub ui_scale: f32,
 	pub frac_scale: bool,
 
-	pub controls: controls::Controls,
+	pub controls: controls::Controls<Action>,
 }
 
 impl Default for Options
@@ -65,7 +95,7 @@ impl Default for Options
 			grab_mouse: false,
 			ui_scale: 1.,
 			frac_scale: true,
-			controls: controls::Controls::new_game(),
+			controls: new_game_controls(),
 		}
 	}
 }
@@ -98,9 +128,9 @@ pub struct GameState
 	bitmaps: HashMap<String, Bitmap>,
 	sprites: HashMap<String, sprite::Sprite>,
 	scenes: HashMap<String, Scene>,
-	pub controls: controls::ControlsHandler,
-	pub game_ui_controls: controls::ControlsHandler,
-	pub menu_controls: controls::ControlsHandler,
+	pub controls: controls::ControlsHandler<Action>,
+	pub game_ui_controls: controls::ControlsHandler<ui::UIAction>,
+	pub menu_controls: controls::ControlsHandler<ui::UIAction>,
 	pub track_mouse: bool,
 	pub hide_mouse: bool,
 	pub mouse_pos: Point2<i32>,
@@ -180,8 +210,8 @@ impl GameState
 			buffer1: None,
 			buffer2: None,
 			controls: controls,
-			game_ui_controls: controls::ControlsHandler::new(controls::Controls::new_game_ui()),
-			menu_controls: controls::ControlsHandler::new(controls::Controls::new_menu()),
+			game_ui_controls: controls::ControlsHandler::new(ui::new_game_ui_controls()),
+			menu_controls: controls::ControlsHandler::new(ui::new_menu_controls()),
 			track_mouse: true,
 			hide_mouse: false,
 			mouse_pos: Point2::new(0, 0),

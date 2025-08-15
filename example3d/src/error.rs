@@ -30,7 +30,7 @@ impl Error
 		}
 	}
 
-	pub fn into_parts(self) ->(String, Option<Box<dyn error::Error + 'static>>)
+	pub fn into_parts(self) -> (String, Option<Box<dyn error::Error + 'static>>)
 	{
 		(self.message, self.inner)
 	}

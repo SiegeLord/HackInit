@@ -66,7 +66,7 @@ impl Game
 			let handled = false; // In case there's other in-game UI to handle this.
 			if state
 				.game_ui_controls
-				.get_action_state(controls::Action::UICancel)
+				.get_action_state(ui::UIAction::Cancel)
 				> 0.5
 			{
 				in_game_menu = true;
@@ -192,7 +192,7 @@ impl Map
 	}
 
 	fn logic(&mut self, state: &mut game_state::GameState)
-		-> Result<Option<game_state::NextScreen>>
+	-> Result<Option<game_state::NextScreen>>
 	{
 		let mut to_die = vec![];
 
@@ -206,7 +206,7 @@ impl Map
 		}
 
 		// Input.
-		if state.controls.get_action_state(controls::Action::Move) > 0.5
+		if state.controls.get_action_state(game_state::Action::Move) > 0.5
 		{
 			for (_, position) in self.world.query::<&mut comps::Position>().iter()
 			{
@@ -370,7 +370,9 @@ impl Map
 
 			if let Ok(scene) = state.get_scene("data/sphere.glb")
 			{
-				scene.draw(&state.core, &state.prim, |_, s| state.get_bitmap(s).map_err(Into::into));
+				scene.draw(&state.core, &state.prim, |_, s| {
+					state.get_bitmap(s).map_err(Into::into)
+				});
 			}
 		}
 

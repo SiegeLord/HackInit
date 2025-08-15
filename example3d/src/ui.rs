@@ -1,3 +1,4 @@
+use crate::controls::Action as ControlsAction;
 use crate::error::Result;
 use crate::{components, controls, game, game_state, utils};
 
@@ -5,6 +6,9 @@ use allegro::*;
 use allegro_font::*;
 use allegro_sys::*;
 use nalgebra::{Matrix4, Point2, Vector2, Vector3};
+use serde_derive::{Deserialize, Serialize};
+
+use std::collections::BTreeMap;
 
 pub const UNSELECTED: Color = Color::from_rgb_f(0.9, 0.9, 0.4);
 pub const LABEL: Color = Color::from_rgb_f(0.7 * 0.9, 0.7 * 0.9, 0.7 * 0.4);
@@ -15,6 +19,156 @@ pub const VERT_SPACE: f32 = 16.;
 pub const BUTTON_WIDTH: f32 = 128.;
 pub const BUTTON_HEIGHT: f32 = 16.;
 pub const CONTROL_WIDTH: f32 = 80.;
+
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
+pub enum UIAction
+{
+	Left,
+	Right,
+	Up,
+	Down,
+	Accept,
+	Cancel,
+}
+
+impl controls::Action for UIAction
+{
+	fn to_str(&self) -> &'static str
+	{
+		match self
+		{
+			UIAction::Left => "Left",
+			UIAction::Right => "Right",
+			UIAction::Up => "Up",
+			UIAction::Down => "Down",
+			UIAction::Accept => "Accept",
+			UIAction::Cancel => "Cancel",
+		}
+	}
+}
+
+pub fn new_menu_controls() -> controls::Controls<UIAction>
+{
+	let mut action_to_inputs = BTreeMap::new();
+	action_to_inputs.insert(
+		UIAction::Up,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Up)),
+			Some(controls::Input::JoystickNegAxis(
+				allegro::JoystickStick::DPad,
+				1,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Down,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Down)),
+			Some(controls::Input::JoystickPosAxis(
+				allegro::JoystickStick::DPad,
+				1,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Left,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Left)),
+			Some(controls::Input::JoystickNegAxis(
+				allegro::JoystickStick::DPad,
+				0,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Right,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Right)),
+			Some(controls::Input::JoystickPosAxis(
+				allegro::JoystickStick::DPad,
+				0,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Accept,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Enter)),
+			Some(controls::Input::JoystickButton(allegro::JoystickButton::A)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Cancel,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Escape)),
+			Some(controls::Input::JoystickButton(allegro::JoystickButton::B)),
+		],
+	);
+	controls::Controls::new(action_to_inputs)
+}
+
+pub fn new_game_ui_controls() -> controls::Controls<UIAction>
+{
+	let mut action_to_inputs = BTreeMap::new();
+	action_to_inputs.insert(
+		UIAction::Up,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Up)),
+			Some(controls::Input::JoystickNegAxis(
+				allegro::JoystickStick::DPad,
+				1,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Down,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Down)),
+			Some(controls::Input::JoystickPosAxis(
+				allegro::JoystickStick::DPad,
+				1,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Left,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Left)),
+			Some(controls::Input::JoystickNegAxis(
+				allegro::JoystickStick::DPad,
+				0,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Right,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Right)),
+			Some(controls::Input::JoystickPosAxis(
+				allegro::JoystickStick::DPad,
+				0,
+			)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Accept,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Enter)),
+			Some(controls::Input::JoystickButton(allegro::JoystickButton::A)),
+		],
+	);
+	action_to_inputs.insert(
+		UIAction::Cancel,
+		[
+			Some(controls::Input::Keyboard(allegro::KeyCode::Escape)),
+			Some(controls::Input::JoystickButton(
+				allegro::JoystickButton::Start,
+			)),
+		],
+	);
+
+	controls::Controls::new(action_to_inputs)
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action
@@ -28,7 +182,7 @@ pub enum Action
 	Forward(fn(&mut game_state::GameState) -> Result<SubScreen>),
 	ToggleFullscreen,
 	ToggleFracScale,
-	ChangeInput(controls::Action, usize),
+	ChangeInput(game_state::Action, usize),
 	MouseSensitivity(f32),
 	UiScale(f32),
 	MusicVolume(f32),
@@ -88,10 +242,7 @@ impl Button
 		let start = self.loc - s * self.size / 2.;
 		let end = self.loc + s * self.size / 2.;
 
-		if state
-			.menu_controls
-			.get_action_state(controls::Action::UIAccept)
-			> 0.5
+		if state.menu_controls.get_action_state(UIAction::Accept) > 0.5
 		{
 			if self.selected
 			{
@@ -99,10 +250,7 @@ impl Button
 				return Some(self.action.clone());
 			}
 		}
-		if state
-			.menu_controls
-			.get_action_state(controls::Action::UICancel)
-			> 0.5
+		if state.menu_controls.get_action_state(UIAction::Cancel) > 0.5
 		{
 			if self.action == Action::Back
 			{
@@ -191,10 +339,7 @@ impl Toggle
 		let s = state.options.ui_scale;
 		let start = self.loc - s * self.size / 2.;
 		let end = self.loc + s * self.size / 2.;
-		if state
-			.menu_controls
-			.get_action_state(controls::Action::UIAccept)
-			> 0.5
+		if state.menu_controls.get_action_state(UIAction::Accept) > 0.5
 		{
 			if self.selected
 			{
@@ -333,10 +478,7 @@ impl Slider
 		let start = self.loc - s * self.size / 2.;
 		let end = self.loc + s * self.size / 2.;
 		let increment = self.round_to;
-		if state
-			.menu_controls
-			.get_action_state(controls::Action::UILeft)
-			> 0.5
+		if state.menu_controls.get_action_state(UIAction::Left) > 0.5
 		{
 			if self.selected && self.cur_pos > self.min_pos
 			{
@@ -346,10 +488,7 @@ impl Slider
 				return Some((self.action_fn)(self.cur_pos));
 			}
 		}
-		if state
-			.menu_controls
-			.get_action_state(controls::Action::UIRight)
-			> 0.5
+		if state.menu_controls.get_action_state(UIAction::Right) > 0.5
 		{
 			if self.selected && self.cur_pos < self.max_pos
 			{
@@ -646,7 +785,7 @@ impl WidgetList
 		}
 		if action.is_none() || action == Some(Action::SelectMe)
 		{
-			if state.menu_controls.get_action_state(controls::Action::UIUp) > 0.5
+			if state.menu_controls.get_action_state(UIAction::Up) > 0.5
 			{
 				state.sfx.play_sound("data/ui1.ogg").unwrap();
 				'found1: loop
@@ -668,10 +807,7 @@ impl WidgetList
 					}
 				}
 			}
-			if state
-				.menu_controls
-				.get_action_state(controls::Action::UIDown)
-				> 0.5
+			if state.menu_controls.get_action_state(UIAction::Down) > 0.5
 			{
 				state.sfx.play_sound("data/ui1.ogg").unwrap();
 				'found2: loop
@@ -693,10 +829,7 @@ impl WidgetList
 					}
 				}
 			}
-			if state
-				.menu_controls
-				.get_action_state(controls::Action::UILeft)
-				> 0.5
+			if state.menu_controls.get_action_state(UIAction::Left) > 0.5
 			{
 				state.sfx.play_sound("data/ui1.ogg").unwrap();
 				let row_len = self.widgets[self.cur_selection.0].len();
@@ -709,10 +842,7 @@ impl WidgetList
 					}
 				}
 			}
-			if state
-				.menu_controls
-				.get_action_state(controls::Action::UIRight)
-				> 0.5
+			if state.menu_controls.get_action_state(UIAction::Right) > 0.5
 			{
 				state.sfx.play_sound("data/ui1.ogg").unwrap();
 				let row_len = self.widgets[self.cur_selection.0].len();

@@ -5,33 +5,9 @@ use std::fmt;
 
 use crate::utils;
 
-#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
-pub enum Action
+pub trait Action: std::cmp::Ord + std::fmt::Debug + Clone
 {
-	Move,
-	UILeft,
-	UIRight,
-	UIUp,
-	UIDown,
-	UIAccept,
-	UICancel,
-}
-
-impl Action
-{
-	pub fn to_str(&self) -> &'static str
-	{
-		match self
-		{
-			Action::Move => "Move",
-			Action::UILeft => "UI Left",
-			Action::UIRight => "UI Right",
-			Action::UIUp => "UI Up",
-			Action::UIDown => "UI Down",
-			Action::UIAccept => "UI Accept",
-			Action::UICancel => "UI Cancel",
-		}
-	}
+	fn to_str(&self) -> &'static str;
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, PartialOrd, Ord)]
@@ -603,133 +579,23 @@ impl InputState
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Controls
+pub struct Controls<ActionT: Action>
 {
-	action_to_inputs: BTreeMap<Action, [Option<Input>; 2]>,
+	action_to_inputs: BTreeMap<ActionT, [Option<Input>; 2]>,
 	mouse_sensitivity: f32,
 }
 
-impl Controls
+impl<ActionT: Action> Controls<ActionT>
 {
-	pub fn new_game() -> Self
+	pub fn new(action_to_inputs: BTreeMap<ActionT, [Option<Input>; 2]>) -> Self
 	{
-		let mut action_to_inputs = BTreeMap::new();
-		action_to_inputs.insert(
-			Action::Move,
-			[Some(Input::Keyboard(allegro::KeyCode::Space)), None],
-		);
-
 		Self {
 			action_to_inputs: action_to_inputs,
 			mouse_sensitivity: 0.1,
 		}
 	}
 
-	pub fn new_menu() -> Self
-	{
-		let mut action_to_inputs = BTreeMap::new();
-		action_to_inputs.insert(
-			Action::UIUp,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Up)),
-				Some(Input::JoystickNegAxis(allegro::JoystickStick::DPad, 1)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIDown,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Down)),
-				Some(Input::JoystickPosAxis(allegro::JoystickStick::DPad, 1)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UILeft,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Left)),
-				Some(Input::JoystickNegAxis(allegro::JoystickStick::DPad, 0)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIRight,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Right)),
-				Some(Input::JoystickPosAxis(allegro::JoystickStick::DPad, 0)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIAccept,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Enter)),
-				Some(Input::JoystickButton(allegro::JoystickButton::A)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UICancel,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Escape)),
-				Some(Input::JoystickButton(allegro::JoystickButton::B)),
-			],
-		);
-
-		Self {
-			action_to_inputs: action_to_inputs,
-			mouse_sensitivity: 0.1,
-		}
-	}
-
-	pub fn new_game_ui() -> Self
-	{
-		let mut action_to_inputs = BTreeMap::new();
-		action_to_inputs.insert(
-			Action::UIUp,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Up)),
-				Some(Input::JoystickNegAxis(allegro::JoystickStick::DPad, 1)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIDown,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Down)),
-				Some(Input::JoystickPosAxis(allegro::JoystickStick::DPad, 1)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UILeft,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Left)),
-				Some(Input::JoystickNegAxis(allegro::JoystickStick::DPad, 0)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIRight,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Right)),
-				Some(Input::JoystickPosAxis(allegro::JoystickStick::DPad, 0)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UIAccept,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Enter)),
-				Some(Input::JoystickButton(allegro::JoystickButton::A)),
-			],
-		);
-		action_to_inputs.insert(
-			Action::UICancel,
-			[
-				Some(Input::Keyboard(allegro::KeyCode::Escape)),
-				Some(Input::JoystickButton(allegro::JoystickButton::Start)),
-			],
-		);
-
-		Self {
-			action_to_inputs: action_to_inputs,
-			mouse_sensitivity: 0.1,
-		}
-	}
-
-	pub fn get_action_string(&self, action: Action) -> String
+	pub fn get_action_string(&self, action: &ActionT) -> String
 	{
 		let mut inputs = vec![];
 		for input in self.action_to_inputs.get(&action).unwrap()
@@ -744,16 +610,16 @@ impl Controls
 }
 
 #[derive(Clone, Debug)]
-pub struct ControlsHandler
+pub struct ControlsHandler<ActionT: Action>
 {
-	controls: Controls,
-	input_to_action: BTreeMap<Input, Action>,
+	controls: Controls<ActionT>,
+	input_to_action: BTreeMap<Input, ActionT>,
 	input_state: HashMap<Input, InputState>,
 }
 
-impl ControlsHandler
+impl<ActionT: Action> ControlsHandler<ActionT>
 {
-	pub fn new(controls: Controls) -> Self
+	pub fn new(controls: Controls<ActionT>) -> Self
 	{
 		let mut ret = Self {
 			controls: controls,
@@ -782,16 +648,16 @@ impl ControlsHandler
 		{
 			if let Some(input1) = input1
 			{
-				self.input_to_action.insert(*input1, *action);
+				self.input_to_action.insert(*input1, action.clone());
 			}
 			if let Some(input2) = input2
 			{
-				self.input_to_action.insert(*input2, *action);
+				self.input_to_action.insert(*input2, action.clone());
 			}
 		}
 	}
 
-	pub fn get_controls(&self) -> &Controls
+	pub fn get_controls(&self) -> &Controls<ActionT>
 	{
 		&self.controls
 	}
@@ -806,17 +672,17 @@ impl ControlsHandler
 		self.controls.mouse_sensitivity = mouse_sensitivity;
 	}
 
-	pub fn get_actions_to_inputs(&self) -> impl Iterator<Item = (&Action, &[Option<Input>; 2])>
+	pub fn get_actions_to_inputs(&self) -> impl Iterator<Item = (&ActionT, &[Option<Input>; 2])>
 	{
 		self.controls.action_to_inputs.iter()
 	}
 
-	pub fn get_inputs(&self, action: Action) -> Option<&[Option<Input>; 2]>
+	pub fn get_inputs(&self, action: ActionT) -> Option<&[Option<Input>; 2]>
 	{
 		self.controls.action_to_inputs.get(&action)
 	}
 
-	pub fn decode_event(&mut self, event: &allegro::Event) -> Vec<(f32, Action)>
+	pub fn decode_event(&mut self, event: &allegro::Event) -> Vec<(f32, ActionT)>
 	{
 		match event
 		{
@@ -973,7 +839,7 @@ impl ControlsHandler
 		vec![]
 	}
 
-	pub fn get_action_state(&mut self, action: Action) -> f32
+	pub fn get_action_state(&mut self, action: ActionT) -> f32
 	{
 		let mut ret = 0.;
 		if let Some(inputs) = self.controls.action_to_inputs.get(&action)
@@ -989,7 +855,7 @@ impl ControlsHandler
 		return ret;
 	}
 
-	pub fn clear_action_state(&mut self, action: Action)
+	pub fn clear_action_state(&mut self, action: ActionT)
 	{
 		if let Some(inputs) = self.controls.action_to_inputs.get(&action)
 		{
@@ -1017,14 +883,14 @@ impl ControlsHandler
 		}
 	}
 
-	pub fn clear_action(&mut self, action: Action, index: usize)
+	pub fn clear_action(&mut self, action: ActionT, index: usize)
 	{
 		self.controls.action_to_inputs.get_mut(&action).unwrap()[index] = None;
 		self.update_derived();
 	}
 
 	pub fn change_action(
-		&mut self, action: Action, index: usize, event: &allegro::Event,
+		&mut self, action: ActionT, index: usize, event: &allegro::Event,
 	) -> Option<bool>
 	{
 		let mut handled = false;
@@ -1102,11 +968,11 @@ impl ControlsHandler
 			if self.input_to_action.contains_key(&new_input)
 			{
 				let old_input = self.controls.action_to_inputs[&action][index];
-				let other_action = self.input_to_action[&new_input];
+				let other_action = &self.input_to_action[&new_input];
 				let other_inputs = self
 					.controls
 					.action_to_inputs
-					.get_mut(&other_action)
+					.get_mut(other_action)
 					.unwrap();
 
 				if other_inputs[0] == Some(new_input)
