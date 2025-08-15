@@ -1,12 +1,13 @@
-use crate::controls::Action as ControlsAction;
 use crate::error::Result;
-use crate::{components, controls, game, game_state, utils};
+use crate::{components, game, game_state, utils};
 
 use allegro::*;
 use allegro_font::*;
 use allegro_sys::*;
 use nalgebra::{Matrix4, Point2, Vector2, Vector3};
 use serde_derive::{Deserialize, Serialize};
+use slhack::controls;
+use slhack::controls::Action as ControlsAction;
 
 use std::collections::BTreeMap;
 

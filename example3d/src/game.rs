@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::utils::DT;
-use crate::{components as comps, controls, game_state, sprite, ui, utils};
+use crate::{components as comps, game_state, sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use na::{
@@ -9,7 +9,7 @@ use na::{
 };
 use nalgebra as na;
 use rand::prelude::*;
-use slhack::scene;
+use slhack::{controls, scene};
 
 use std::collections::HashMap;
 use std::f32::consts::PI;

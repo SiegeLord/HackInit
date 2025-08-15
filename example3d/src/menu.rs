@@ -1,11 +1,12 @@
 use crate::error::Result;
-use crate::{components, controls, game_state, ui, utils};
+use crate::{components, game_state, ui, utils};
 
 use allegro::*;
 use allegro_font::*;
 use allegro_sys::*;
 use nalgebra::{Matrix4, Point2};
 use rand::prelude::*;
+use slhack::controls;
 
 pub struct Menu
 {

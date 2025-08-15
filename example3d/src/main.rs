@@ -5,7 +5,6 @@
 #![allow(clippy::all)]
 
 mod components;
-mod controls;
 mod error;
 mod game;
 mod game_state;

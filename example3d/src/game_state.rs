@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{controls, sprite, ui, utils};
+use crate::{sprite, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use allegro_image::*;
@@ -7,7 +7,7 @@ use allegro_primitives::*;
 use allegro_ttf::*;
 use nalgebra::Point2;
 use serde_derive::{Deserialize, Serialize};
-use slhack::{atlas, deferred, scene, sfx};
+use slhack::{atlas, controls, deferred, scene, sfx};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::{fmt, path, sync};
