@@ -144,13 +144,14 @@ pub struct GameState
 	pub final_shader: Option<Shader>,
 	pub deferred_renderer: Option<deferred::DeferredRenderer>,
 
-	pub _display: Option<Display>,
-
 	pub alpha: f32,
 
 	bitmaps: HashMap<String, Bitmap>,
 	sprites: HashMap<String, sprite::Sprite>,
 	scenes: HashMap<String, Scene>,
+
+	// Has to be last!
+	pub _display: Option<Display>,
 }
 
 pub fn load_options(core: &Core) -> Result<Options>
