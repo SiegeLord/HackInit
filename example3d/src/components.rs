@@ -1,7 +1,7 @@
-use crate::sprite;
 use allegro::*;
 use nalgebra::Point3;
 use rand::prelude::*;
+use slhack::sprite;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Light

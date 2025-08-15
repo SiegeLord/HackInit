@@ -1,10 +1,9 @@
 use crate::error::Result;
-use crate::utils;
+use crate::{atlas, utils};
 use allegro::*;
 use na::{Point2, Vector2};
 use nalgebra as na;
 use serde_derive::{Deserialize, Serialize};
-use slhack::atlas;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -15,11 +14,6 @@ struct AnimationDesc
 	frame_ms: Vec<f64>,
 	#[serde(default)]
 	active_frames: HashMap<String, i32>,
-}
-
-fn default_false() -> bool
-{
-	false
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -41,7 +35,6 @@ struct SpriteDesc
 struct Animation
 {
 	frames: Vec<atlas::AtlasBitmap>,
-	duration_ms: f64,
 }
 
 pub struct Sprite
@@ -123,7 +116,6 @@ impl Sprite
 					.iter()
 					.map(|&i| frames[(i - 1) as usize].clone())
 					.collect(),
-				duration_ms: animation_desc.frame_ms.iter().sum(),
 			};
 			animations.insert(name.to_string(), animation);
 		}

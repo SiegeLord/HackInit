@@ -9,7 +9,6 @@ mod error;
 mod game;
 mod game_state;
 mod menu;
-mod sprite;
 mod ui;
 
 use crate::error::Result;
