@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{game_state, utils};
+use crate::utils;
 use allegro::*;
 use na::{Point2, Vector2};
 use nalgebra as na;
@@ -135,20 +135,22 @@ impl Sprite
 	}
 
 	pub fn draw_frame_from_state(
-		&self, pos: Point2<f32>, animation_state: &AnimationState, state: &game_state::GameState,
+		&self, pos: Point2<f32>, animation_state: &AnimationState, core: &Core,
+		atlas: &atlas::Atlas,
 	)
 	{
 		self.draw_frame(
 			pos,
 			&animation_state.animation_name,
 			animation_state.frame_idx,
-			state,
+			core,
+			atlas,
 		);
 	}
 
 	pub fn draw_frame(
-		&self, pos: Point2<f32>, animation_name: &str, frame_idx: i32,
-		state: &game_state::GameState,
+		&self, pos: Point2<f32>, animation_name: &str, frame_idx: i32, core: &Core,
+		atlas: &atlas::Atlas,
 	)
 	{
 		let w = self.desc.width as f32;
@@ -156,8 +158,8 @@ impl Sprite
 		let animation = &self.animations[animation_name];
 		let atlas_bmp = &animation.frames[frame_idx as usize];
 
-		state.core.draw_bitmap_region(
-			&state.atlas.pages[atlas_bmp.page].bitmap,
+		core.draw_bitmap_region(
+			&atlas.pages[atlas_bmp.page].bitmap,
 			atlas_bmp.start.x,
 			atlas_bmp.start.y,
 			w,
