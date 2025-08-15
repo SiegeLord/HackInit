@@ -15,15 +15,93 @@ use crate::error::Result;
 use allegro::*;
 use allegro_dialog::*;
 use allegro_sys::*;
+use game_state::NextScreen;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use slhack::utils;
 use std::rc::Rc;
 
-enum Screen
+trait Screen
+{
+	type NextScreen;
+	type ScreenT;
+	const INIT_SCREEN: Self::NextScreen;
+
+	fn new(
+		next_screen: Self::NextScreen, game_state: &mut game_state::GameState,
+	) -> Result<Option<Self::ScreenT>>;
+	fn draw(&mut self, game_state: &mut game_state::GameState) -> Result<()>;
+	fn input(
+		&mut self, event: &Event, game_state: &mut game_state::GameState,
+	) -> Result<Option<Self::NextScreen>>;
+	fn logic(&mut self, game_state: &mut game_state::GameState)
+		-> Result<Option<Self::NextScreen>>;
+	fn resize(&mut self, game_state: &mut game_state::GameState) -> Result<()>;
+}
+
+enum Screen2
 {
 	Game(game::Game),
 	Menu(menu::Menu),
+}
+
+impl Screen for Screen2
+{
+	type ScreenT = Screen2;
+	type NextScreen = game_state::NextScreen;
+	const INIT_SCREEN: Self::NextScreen = game_state::NextScreen::Menu;
+
+	fn new(
+		next_screen: Self::NextScreen, game_state: &mut game_state::GameState,
+	) -> Result<Option<Self>>
+	{
+		match next_screen
+		{
+			game_state::NextScreen::Game => Ok(Some(Screen2::Game(game::Game::new(game_state)?))),
+			game_state::NextScreen::Menu => Ok(Some(Screen2::Menu(menu::Menu::new(game_state)?))),
+			game_state::NextScreen::Quit => Ok(None),
+			_ => panic!("Unknown next screen {:?}", next_screen),
+		}
+	}
+
+	fn draw(&mut self, game_state: &mut game_state::GameState) -> Result<()>
+	{
+		match self
+		{
+			Screen2::Menu(menu) => menu.draw(game_state),
+			Screen2::Game(game) => game.draw(game_state),
+		}
+	}
+
+	fn input(
+		&mut self, event: &Event, game_state: &mut game_state::GameState,
+	) -> Result<Option<Self::NextScreen>>
+	{
+		match self
+		{
+			Screen2::Menu(menu) => menu.input(event, game_state),
+			Screen2::Game(game) => game.input(event, game_state),
+		}
+	}
+
+	fn logic(&mut self, game_state: &mut game_state::GameState)
+		-> Result<Option<Self::NextScreen>>
+	{
+		match self
+		{
+			Screen2::Game(game) => game.logic(game_state),
+			_ => Ok(None),
+		}
+	}
+
+	fn resize(&mut self, game_state: &mut game_state::GameState) -> Result<()>
+	{
+		match self
+		{
+			Screen2::Menu(menu) => Ok(menu.resize(game_state)),
+			Screen2::Game(game) => Ok(game.resize(game_state)),
+		}
+	}
 }
 
 fn real_main() -> Result<()>
@@ -109,8 +187,8 @@ fn real_main() -> Result<()>
 		state.core.grab_mouse(state.display()).ok();
 	}
 
-	let mut cur_screen = Screen::Menu(menu::Menu::new(&mut state)?);
-	//let mut cur_screen = Screen::Game(game::Game::new(&mut state)?);
+	type ScreenT = Screen2;
+	let mut cur_screen = ScreenT::new(ScreenT::INIT_SCREEN, &mut state)?.unwrap();
 	state.hide_mouse = true;
 
 	timer.start();
@@ -126,22 +204,14 @@ fn real_main() -> Result<()>
 				old_ui_scale = state.options.ui_scale;
 				old_frac_scale = state.options.frac_scale;
 				state.resize_display()?;
-				match &mut cur_screen
-				{
-					Screen::Game(game) => game.resize(&state),
-					Screen::Menu(menu) => menu.resize(&state),
-				}
+				cur_screen.resize(&mut state)?;
 			}
 
 			let frame_start = state.core.get_time();
 			state.core.set_target_bitmap(Some(state.buffer1()));
 			state.alpha = (frame_start - logic_end) as f32 / utils::DT;
 
-			match &mut cur_screen
-			{
-				Screen::Game(game) => game.draw(&mut state)?,
-				Screen::Menu(menu) => menu.draw(&mut state)?,
-			}
+			cur_screen.draw(&mut state)?;
 
 			if state.options.vsync_method == 2
 			{
@@ -210,11 +280,7 @@ fn real_main() -> Result<()>
 		state.controls.decode_event(&event);
 		state.game_ui_controls.decode_event(&event);
 		state.menu_controls.decode_event(&event);
-		let mut next_screen = match &mut cur_screen
-		{
-			Screen::Game(game) => game.input(&event, &mut state)?,
-			Screen::Menu(menu) => menu.input(&event, &mut state)?,
-		};
+		let mut next_screen = cur_screen.input(&event, &mut state)?;
 		state.game_ui_controls.clear_action_states();
 		state.menu_controls.clear_action_states();
 
@@ -281,11 +347,7 @@ fn real_main() -> Result<()>
 
 				if next_screen.is_none()
 				{
-					next_screen = match &mut cur_screen
-					{
-						Screen::Game(game) => game.logic(&mut state)?,
-						_ => None,
-					}
+					next_screen = cur_screen.logic(&mut state)?;
 				}
 
 				if state.hide_mouse && switched_in
@@ -331,21 +393,13 @@ fn real_main() -> Result<()>
 
 		if let Some(next_screen) = next_screen
 		{
-			match next_screen
+			if let Some(new_screen) = ScreenT::new(next_screen, &mut state)?
 			{
-				game_state::NextScreen::Game =>
-				{
-					cur_screen = Screen::Game(game::Game::new(&mut state)?);
-				}
-				game_state::NextScreen::Menu =>
-				{
-					cur_screen = Screen::Menu(menu::Menu::new(&mut state)?);
-				}
-				game_state::NextScreen::Quit =>
-				{
-					quit = true;
-				}
-				_ => panic!("Unknown next screen {:?}", next_screen),
+				cur_screen = new_screen;
+			}
+			else
+			{
+				quit = true;
 			}
 		}
 	}

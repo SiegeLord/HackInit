@@ -125,9 +125,6 @@ pub struct GameState
 	pub atlas: atlas::Atlas,
 	pub ui_font: Option<Font>,
 	pub options: Options,
-	bitmaps: HashMap<String, Bitmap>,
-	sprites: HashMap<String, sprite::Sprite>,
-	scenes: HashMap<String, Scene>,
 	pub controls: controls::ControlsHandler<Action>,
 	pub game_ui_controls: controls::ControlsHandler<ui::UIAction>,
 	pub menu_controls: controls::ControlsHandler<ui::UIAction>,
@@ -150,6 +147,10 @@ pub struct GameState
 	pub _display: Option<Display>,
 
 	pub alpha: f32,
+
+	bitmaps: HashMap<String, Bitmap>,
+	sprites: HashMap<String, sprite::Sprite>,
+	scenes: HashMap<String, Scene>,
 }
 
 pub fn load_options(core: &Core) -> Result<Options>
