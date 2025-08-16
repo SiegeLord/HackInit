@@ -131,6 +131,13 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 		let hs = state.hs();
 		hs.core.grab_mouse(hs.display()).ok();
 	}
+	if state.hs().hide_mouse
+	{
+		let hs = state.hs();
+		hs.display()
+			.show_cursor(!hs.hide_mouse)
+			.map_err(|_| "Could not hide cursor.".to_string())?;
+	}
 
 	timer.start();
 	while !quit
