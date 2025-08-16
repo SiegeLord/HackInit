@@ -9,7 +9,7 @@ use na::{
 };
 use nalgebra as na;
 use rand::prelude::*;
-use slhack::{controls, scene, sprite};
+use slhack::{controls, scene, sprite, ui as slhack_ui};
 
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -52,10 +52,10 @@ impl Game
 		{
 			Event::MouseAxes { x, y, .. } =>
 			{
-				if state.track_mouse
+				if state.hs.track_mouse
 				{
-					let (x, y) = state.transform_mouse(x as f32, y as f32);
-					state.mouse_pos = Point2::new(x as i32, y as i32);
+					let (x, y) = state.hs.transform_mouse(x as f32, y as f32);
+					state.hs.mouse_pos = Point2::new(x as i32, y as i32);
 				}
 			}
 			_ => (),
@@ -65,8 +65,9 @@ impl Game
 			let mut in_game_menu = false;
 			let handled = false; // In case there's other in-game UI to handle this.
 			if state
+				.hs
 				.game_ui_controls
-				.get_action_state(ui::UIAction::Cancel)
+				.get_action_state(slhack_ui::UIAction::Cancel)
 				> 0.5
 			{
 				in_game_menu = true;
@@ -115,7 +116,10 @@ impl Game
 	{
 		if !self.subscreens.is_empty()
 		{
-			state.core.clear_to_color(Color::from_rgb_f(0.0, 0.0, 0.0));
+			state
+				.hs
+				.core
+				.clear_to_color(Color::from_rgb_f(0.0, 0.0, 0.0));
 			self.subscreens.draw(state);
 		}
 		else
@@ -196,7 +200,7 @@ impl Map
 	{
 		let mut to_die = vec![];
 
-		let t = state.time() / 3.;
+		let t = state.hs.time() / 3.;
 		self.camera_target = Point3::new(20. * t.cos() as f32 - 2., 1., 20. * t.sin() as f32 - 1.);
 
 		// Position snapshotting.
@@ -246,7 +250,7 @@ impl Map
 
 	fn make_project(&self, state: &game_state::GameState) -> Perspective3<f32>
 	{
-		utils::projection_transform(state.buffer_width(), state.buffer_height(), PI / 3.)
+		utils::projection_transform(state.hs.buffer_width(), state.hs.buffer_height(), PI / 3.)
 	}
 
 	fn camera_pos(&self) -> Point3<f32>
@@ -266,17 +270,20 @@ impl Map
 
 		// Forward pass.
 		state
+			.hs
 			.core
 			.use_projection_transform(&utils::mat4_to_transform(project.to_homogeneous()));
 		state
+			.hs
 			.core
 			.use_transform(&utils::mat4_to_transform(camera.to_homogeneous()));
 		state
 			.deferred_renderer
 			.as_mut()
 			.unwrap()
-			.begin_forward_pass(&state.core)?;
+			.begin_forward_pass(&state.hs.core)?;
 		state
+			.hs
 			.core
 			.use_shader(Some(state.forward_shader.as_ref().unwrap()))
 			.unwrap();
@@ -284,9 +291,11 @@ impl Map
 		let shift = Isometry3::new(Vector3::zeros(), Vector3::zeros()).to_homogeneous();
 
 		state
+			.hs
 			.core
 			.use_transform(&utils::mat4_to_transform(camera.to_homogeneous() * shift));
 		state
+			.hs
 			.core
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
@@ -298,39 +307,43 @@ impl Map
 		};
 
 		state
+			.hs
 			.core
 			.set_shader_sampler("lightmap", state.get_bitmap("data/level_lightmap.png")?, 1)
 			.ok();
 		state
 			.get_scene("data/test_level_sprytile.glb")
 			.unwrap()
-			.draw(&state.core, &state.prim, material_mapper);
+			.draw(&state.hs.core, &state.hs.prim, material_mapper);
 
 		for (_, (position, scene)) in self
 			.world
 			.query::<(&comps::Position, &comps::Scene)>()
 			.iter()
 		{
-			let shift = Isometry3::new(position.draw_pos(state.alpha).coords, Vector3::zeros())
+			let shift = Isometry3::new(position.draw_pos(state.hs.alpha).coords, Vector3::zeros())
 				.to_homogeneous();
 
 			state
+				.hs
 				.core
 				.use_transform(&utils::mat4_to_transform(camera.to_homogeneous() * shift));
 			state
+				.hs
 				.core
 				.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 				.ok();
 
-			state
-				.get_scene(&scene.scene)
-				.unwrap()
-				.draw(&state.core, &state.prim, material_mapper);
+			state.get_scene(&scene.scene).unwrap().draw(
+				&state.hs.core,
+				&state.hs.prim,
+				material_mapper,
+			);
 		}
 
 		// Light pass.
 		state.deferred_renderer.as_mut().unwrap().begin_light_pass(
-			&state.core,
+			&state.hs.core,
 			state.light_shader.as_ref().unwrap(),
 			&utils::mat4_to_transform(project.to_homogeneous()),
 			self.camera_pos(),
@@ -341,36 +354,40 @@ impl Map
 			.query::<(&comps::Position, &comps::Light)>()
 			.iter()
 		{
-			let shift = Isometry3::new(position.draw_pos(state.alpha).coords, Vector3::zeros());
+			let shift = Isometry3::new(position.draw_pos(state.hs.alpha).coords, Vector3::zeros());
 			let transform = Similarity3::from_isometry(shift, 0.5 * light.intensity.sqrt());
 			let light_pos = transform.transform_point(&Point3::origin());
 
 			let (r, g, b) = light.color.to_rgb_f();
 
 			state
+				.hs
 				.core
 				.set_shader_uniform("light_color", &[[r, g, b, 1.0]][..])
 				.ok(); //.unwrap();
 			state
+				.hs
 				.core
 				.set_shader_uniform("light_pos", &[[light_pos.x, light_pos.y, light_pos.z]][..])
 				.ok(); //.unwrap();
 			state
+				.hs
 				.core
 				.set_shader_uniform("light_intensity", &[light.intensity][..])
 				.ok(); //.unwrap();
 			state
+				.hs
 				.core
 				.set_shader_uniform("is_static", &[light.static_ as i32][..])
 				.ok(); //.unwrap();
 
-			state.core.use_transform(&utils::mat4_to_transform(
+			state.hs.core.use_transform(&utils::mat4_to_transform(
 				camera.to_homogeneous() * transform.to_homogeneous(),
 			));
 
 			if let Ok(scene) = state.get_scene("data/sphere.glb")
 			{
-				scene.draw(&state.core, &state.prim, |_, s| {
+				scene.draw(&state.hs.core, &state.hs.prim, |_, s| {
 					state.get_bitmap(s).map_err(Into::into)
 				});
 			}
@@ -378,21 +395,23 @@ impl Map
 
 		// Final pass.
 		state.deferred_renderer.as_mut().unwrap().final_pass(
-			&state.core,
-			&state.prim,
+			&state.hs.core,
+			&state.hs.prim,
 			state.final_shader.as_ref().unwrap(),
-			state.buffer1.as_ref().unwrap(),
+			state.hs.buffer1.as_ref().unwrap(),
 		)?;
 
 		state
+			.hs
 			.core
 			.use_shader(Some(state.basic_shader.as_ref().unwrap()))
 			.unwrap();
 		unsafe {
 			gl::Disable(gl::CULL_FACE);
 		}
-		state.core.set_depth_test(None);
+		state.hs.core.set_depth_test(None);
 		state
+			.hs
 			.core
 			.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::InverseAlpha);
 		Ok(())

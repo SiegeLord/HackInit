@@ -167,7 +167,7 @@ pub fn new_game_ui_controls() -> controls::Controls<UIAction>
 	controls::Controls::new(action_to_inputs)
 }
 
-pub trait Action: PartialEq + Eq
+pub trait Action: PartialEq
 {
 	const SELECT_ME: Self;
 	const BACK: Self;
@@ -266,6 +266,16 @@ impl<ActionT: Action + Clone> Button<ActionT>
 			_ => (),
 		}
 		None
+	}
+
+	pub fn get_action(&self) -> &ActionT
+	{
+		&self.action
+	}
+
+	pub fn set_text(&mut self, text: &str)
+	{
+		self.text = text.to_string();
 	}
 }
 
@@ -923,5 +933,20 @@ impl<ActionT: Action + Clone> WidgetList<ActionT>
 	pub fn set_pos(&mut self, pos: Point2<f32>)
 	{
 		self.pos = pos;
+	}
+
+	pub fn widgets(&self) -> &[Vec<Widget<ActionT>>]
+	{
+		&self.widgets
+	}
+
+	pub fn widgets_mut(&mut self) -> &mut [Vec<Widget<ActionT>>]
+	{
+		&mut self.widgets
+	}
+
+	pub fn cur_selection(&self) -> (usize, usize)
+	{
+		self.cur_selection
 	}
 }

@@ -57,7 +57,7 @@ impl Page
 	}
 
 	fn insert<B: BitmapLike>(&mut self, core: &Core, bitmap: &B, page: usize)
-		-> Option<AtlasBitmap>
+	-> Option<AtlasBitmap>
 	{
 		if let Some(placement) = self
 			.packer

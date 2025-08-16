@@ -22,7 +22,7 @@ impl Menu
 {
 	pub fn new(state: &mut game_state::GameState) -> Result<Self>
 	{
-		state.paused = false;
+		state.hs.paused = false;
 		state.sfx.cache_sample("data/ui1.ogg")?;
 		state.sfx.cache_sample("data/ui2.ogg")?;
 		state.cache_sprite("data/title.cfg")?;
@@ -41,10 +41,10 @@ impl Menu
 		{
 			Event::MouseAxes { x, y, .. } =>
 			{
-				if state.track_mouse
+				if state.hs.track_mouse
 				{
-					let (x, y) = state.transform_mouse(x as f32, y as f32);
-					state.mouse_pos = Point2::new(x as i32, y as i32);
+					let (x, y) = state.hs.transform_mouse(x as f32, y as f32);
+					state.hs.mouse_pos = Point2::new(x as i32, y as i32);
 				}
 			}
 			_ => (),
@@ -63,7 +63,7 @@ impl Menu
 
 	pub fn draw(&mut self, state: &game_state::GameState) -> Result<()>
 	{
-		state.core.clear_to_color(Color::from_rgb_f(0., 0., 0.5));
+		state.hs.core.clear_to_color(Color::from_rgb_f(0., 0., 0.5));
 		self.subscreens.draw(state);
 
 		Ok(())
