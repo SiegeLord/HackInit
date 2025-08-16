@@ -15,6 +15,16 @@ pub const SELECTED: Color = Color::from_rgb_f(1., 1., 1.);
 
 pub const HORIZ_SPACE: f32 = 16.;
 pub const VERT_SPACE: f32 = 16.;
+
+const THEME: ui::Theme = ui::Theme {
+	unselected: Color::from_rgb_f(0.9, 0.9, 0.4),
+	label: Color::from_rgb_f(0.7 * 0.9, 0.7 * 0.9, 0.7 * 0.9),
+	selected: Color::from_rgb_f(1., 1., 1.),
+
+	horiz_space: 16.,
+	vert_space: 16.,
+};
+
 pub const BUTTON_WIDTH: f32 = 128.;
 pub const BUTTON_HEIGHT: f32 = 16.;
 pub const CONTROL_WIDTH: f32 = 80.;
@@ -69,6 +79,7 @@ impl MainMenu
 				h,
 				"Resume Game",
 				Action::Resume,
+				THEME.clone(),
 			))]);
 		}
 
@@ -78,29 +89,36 @@ impl MainMenu
 				h,
 				"New Game",
 				Action::Start,
+				THEME.clone(),
 			))],
 			vec![ui::Widget::Button(ui::Button::new(
 				w,
 				h,
 				"Controls",
 				Action::Forward(|s| Ok(SubScreen::ControlsMenu(ControlsMenu::new(s)))),
+				THEME.clone(),
 			))],
 			vec![ui::Widget::Button(ui::Button::new(
 				w,
 				h,
 				"Options",
 				Action::Forward(|s| Ok(SubScreen::OptionsMenu(OptionsMenu::new(s)))),
+				THEME.clone(),
 			))],
 			vec![ui::Widget::Button(ui::Button::new(
 				w,
 				h,
 				"Quit",
 				Action::Quit,
+				THEME.clone(),
 			))],
 		]);
 
 		let mut res = Self {
-			widgets: ui::WidgetList::new(&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>()),
+			widgets: ui::WidgetList::new(
+				&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>(),
+				THEME.clone(),
+			),
 		};
 		res.resize(state);
 		Ok(res)
@@ -177,7 +195,12 @@ impl ControlsMenu
 
 		for (&action, &inputs) in state.controls.get_actions_to_inputs()
 		{
-			let mut row = vec![ui::Widget::Label(ui::Label::new(w, h, &action.to_str()))];
+			let mut row = vec![ui::Widget::Label(ui::Label::new(
+				w,
+				h,
+				&action.to_str(),
+				THEME.clone(),
+			))];
 			for i in 0..2
 			{
 				let input = inputs[i];
@@ -189,6 +212,7 @@ impl ControlsMenu
 					h,
 					&input_str,
 					Action::ChangeInput(action, i),
+					THEME.clone(),
 				)));
 			}
 			widgets.push(row);
@@ -198,10 +222,14 @@ impl ControlsMenu
 			h,
 			"Back",
 			Action::Back,
+			THEME.clone(),
 		))]);
 
 		let mut res = Self {
-			widgets: ui::WidgetList::new(&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>()),
+			widgets: ui::WidgetList::new(
+				&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>(),
+				THEME.clone(),
+			),
 			accepting_input: false,
 		};
 		res.resize(state);
@@ -335,27 +363,29 @@ impl OptionsMenu
 
 		let widgets = [
 			vec![
-				ui::Widget::Label(ui::Label::new(w, h, "Fullscreen")),
+				ui::Widget::Label(ui::Label::new(w, h, "Fullscreen", THEME.clone())),
 				ui::Widget::Toggle(ui::Toggle::new(
 					w,
 					h,
 					state.options.gfx.fullscreen as usize,
 					vec!["No".into(), "Yes".into()],
 					|_| Action::ToggleFullscreen,
+					THEME.clone(),
 				)),
 			],
 			vec![
-				ui::Widget::Label(ui::Label::new(w, h, "Fractional Scale")),
+				ui::Widget::Label(ui::Label::new(w, h, "Fractional Scale", THEME.clone())),
 				ui::Widget::Toggle(ui::Toggle::new(
 					w,
 					h,
 					state.options.gfx.frac_scale as usize,
 					vec!["No".into(), "Yes".into()],
 					|_| Action::ToggleFracScale,
+					THEME.clone(),
 				)),
 			],
 			vec![
-				ui::Widget::Label(ui::Label::new(w, h, "Music")),
+				ui::Widget::Label(ui::Label::new(w, h, "Music", THEME.clone())),
 				ui::Widget::Slider(ui::Slider::new(
 					w,
 					h,
@@ -364,10 +394,11 @@ impl OptionsMenu
 					4.,
 					0.1,
 					|i| Action::MusicVolume(i),
+					THEME.clone(),
 				)),
 			],
 			vec![
-				ui::Widget::Label(ui::Label::new(w, h, "SFX")),
+				ui::Widget::Label(ui::Label::new(w, h, "SFX", THEME.clone())),
 				ui::Widget::Slider(ui::Slider::new(
 					w,
 					h,
@@ -376,10 +407,11 @@ impl OptionsMenu
 					4.,
 					0.1,
 					|i| Action::SfxVolume(i),
+					THEME.clone(),
 				)),
 			],
 			//vec![
-			//	ui::Widget::Label(ui::Label::new(w, h, "UI Scale")),
+			//	ui::Widget::Label(ui::Label::new(w, h, "UI Scale", THEME.clone())),
 			//	ui::Widget::Slider(ui::Slider::new(
 			//		w,
 			//		h,
@@ -387,11 +419,11 @@ impl OptionsMenu
 			//		1.,
 			//		4.,
 			//		0.25,
-			//		|i| Action::UiScale(i),
+			//		|i| Action::UiScale(i), THEME.clone(),
 			//	)),
 			//],
 			//vec![
-			//	ui::Widget::Label(ui::Label::new(w, h, "Scroll")),
+			//	ui::Widget::Label(ui::Label::new(w, h, "Scroll", THEME.clone())),
 			//	ui::Widget::Slider(ui::Slider::new(
 			//		w,
 			//		h,
@@ -399,7 +431,7 @@ impl OptionsMenu
 			//		1.,
 			//		10.,
 			//		1.,
-			//		|i| Action::CameraSpeed(i as i32),
+			//		|i| Action::CameraSpeed(i as i32), THEME.clone(),
 			//	)),
 			//],
 			vec![ui::Widget::Button(ui::Button::new(
@@ -407,11 +439,15 @@ impl OptionsMenu
 				h,
 				"Back",
 				Action::Back,
+				THEME.clone(),
 			))],
 		];
 
 		let mut res = Self {
-			widgets: ui::WidgetList::new(&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>()),
+			widgets: ui::WidgetList::new(
+				&widgets.iter().map(|r| &r[..]).collect::<Vec<_>>(),
+				THEME.clone(),
+			),
 		};
 		res.resize(state);
 		res
@@ -483,32 +519,39 @@ impl InGameMenu
 		let w = BUTTON_WIDTH;
 		let h = BUTTON_HEIGHT;
 
-		let widgets = ui::WidgetList::new(&[
-			&[ui::Widget::Button(ui::Button::new(
-				w,
-				h,
-				"Resume",
-				Action::Back,
-			))],
-			&[ui::Widget::Button(ui::Button::new(
-				w,
-				h,
-				"Controls",
-				Action::Forward(|s| Ok(SubScreen::ControlsMenu(ControlsMenu::new(s)))),
-			))],
-			&[ui::Widget::Button(ui::Button::new(
-				w,
-				h,
-				"Options",
-				Action::Forward(|s| Ok(SubScreen::OptionsMenu(OptionsMenu::new(s)))),
-			))],
-			&[ui::Widget::Button(ui::Button::new(
-				w,
-				h,
-				"Save and Quit",
-				Action::MainMenu,
-			))],
-		]);
+		let widgets = ui::WidgetList::new(
+			&[
+				&[ui::Widget::Button(ui::Button::new(
+					w,
+					h,
+					"Resume",
+					Action::Back,
+					THEME.clone(),
+				))],
+				&[ui::Widget::Button(ui::Button::new(
+					w,
+					h,
+					"Controls",
+					Action::Forward(|s| Ok(SubScreen::ControlsMenu(ControlsMenu::new(s)))),
+					THEME.clone(),
+				))],
+				&[ui::Widget::Button(ui::Button::new(
+					w,
+					h,
+					"Options",
+					Action::Forward(|s| Ok(SubScreen::OptionsMenu(OptionsMenu::new(s)))),
+					THEME.clone(),
+				))],
+				&[ui::Widget::Button(ui::Button::new(
+					w,
+					h,
+					"Save and Quit",
+					Action::MainMenu,
+					THEME.clone(),
+				))],
+			],
+			THEME.clone(),
+		);
 		let mut res = Self { widgets };
 		res.resize(state);
 		res

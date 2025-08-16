@@ -7,15 +7,16 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 
-pub const UNSELECTED: Color = Color::from_rgb_f(0.9, 0.9, 0.4);
-pub const LABEL: Color = Color::from_rgb_f(0.7 * 0.9, 0.7 * 0.9, 0.7 * 0.4);
-pub const SELECTED: Color = Color::from_rgb_f(1., 1., 1.);
+#[derive(Clone, Debug)]
+pub struct Theme
+{
+	pub unselected: Color,
+	pub label: Color,
+	pub selected: Color,
 
-pub const HORIZ_SPACE: f32 = 16.;
-pub const VERT_SPACE: f32 = 16.;
-pub const BUTTON_WIDTH: f32 = 128.;
-pub const BUTTON_HEIGHT: f32 = 16.;
-pub const CONTROL_WIDTH: f32 = 80.;
+	pub horiz_space: f32,
+	pub vert_space: f32,
+}
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
 pub enum UIAction
@@ -181,11 +182,12 @@ pub struct Button<ActionT>
 	text: String,
 	action: ActionT,
 	selected: bool,
+	theme: Theme,
 }
 
 impl<ActionT: Action + Clone> Button<ActionT>
 {
-	pub fn new(w: f32, h: f32, text: &str, action: ActionT) -> Self
+	pub fn new(w: f32, h: f32, text: &str, action: ActionT, theme: Theme) -> Self
 	{
 		Self {
 			loc: Point2::new(0., 0.),
@@ -193,6 +195,7 @@ impl<ActionT: Action + Clone> Button<ActionT>
 			text: text.into(),
 			action: action,
 			selected: false,
+			theme: theme,
 		}
 	}
 
@@ -208,7 +211,14 @@ impl<ActionT: Action + Clone> Button<ActionT>
 
 	pub fn draw(&self, state: &hack_state::HackState)
 	{
-		let c_ui = if self.selected { SELECTED } else { UNSELECTED };
+		let c_ui = if self.selected
+		{
+			self.theme.selected
+		}
+		else
+		{
+			self.theme.unselected
+		};
 
 		state.core.draw_text(
 			state.ui_font(),
@@ -288,12 +298,14 @@ pub struct Toggle<ActionT>
 	cur_value: usize,
 	action_fn: fn(usize) -> ActionT,
 	selected: bool,
+	theme: Theme,
 }
 
 impl<ActionT: Action> Toggle<ActionT>
 {
 	pub fn new(
 		w: f32, h: f32, cur_value: usize, texts: Vec<String>, action_fn: fn(usize) -> ActionT,
+		theme: Theme,
 	) -> Self
 	{
 		Self {
@@ -303,6 +315,7 @@ impl<ActionT: Action> Toggle<ActionT>
 			cur_value: cur_value,
 			action_fn: action_fn,
 			selected: false,
+			theme: theme,
 		}
 	}
 
@@ -318,7 +331,14 @@ impl<ActionT: Action> Toggle<ActionT>
 
 	pub fn draw(&self, state: &hack_state::HackState)
 	{
-		let c_ui = if self.selected { SELECTED } else { UNSELECTED };
+		let c_ui = if self.selected
+		{
+			self.theme.selected
+		}
+		else
+		{
+			self.theme.unselected
+		};
 
 		state.core.draw_text(
 			state.ui_font(),
@@ -387,13 +407,14 @@ pub struct Slider<ActionT>
 	selected: bool,
 	round_to: f32,
 	action_fn: fn(f32) -> ActionT,
+	theme: Theme,
 }
 
 impl<ActionT: Action> Slider<ActionT>
 {
 	pub fn new(
 		w: f32, h: f32, cur_pos: f32, min_pos: f32, max_pos: f32, round_to: f32,
-		action_fn: fn(f32) -> ActionT,
+		action_fn: fn(f32) -> ActionT, theme: Theme,
 	) -> Self
 	{
 		Self {
@@ -406,6 +427,7 @@ impl<ActionT: Action> Slider<ActionT>
 			selected: false,
 			round_to: round_to,
 			action_fn: action_fn,
+			theme: theme,
 		}
 	}
 
@@ -427,7 +449,14 @@ impl<ActionT: Action> Slider<ActionT>
 	pub fn draw(&self, state: &hack_state::HackState)
 	{
 		let s = state.gfx_options.ui_scale;
-		let c_ui = if self.selected { SELECTED } else { UNSELECTED };
+		let c_ui = if self.selected
+		{
+			self.theme.selected
+		}
+		else
+		{
+			self.theme.unselected
+		};
 
 		let w = s * self.width();
 		let cursor_x =
@@ -435,7 +464,7 @@ impl<ActionT: Action> Slider<ActionT>
 		let start_x = self.loc.x - w / 2.;
 		let end_x = self.loc.x + w / 2.;
 
-		let ww = s * HORIZ_SPACE;
+		let ww = s * self.theme.horiz_space;
 		if cursor_x - start_x > ww
 		{
 			state
@@ -548,22 +577,24 @@ pub struct Label
 	size: Vector2<f32>,
 	text: String,
 	align: FontAlign,
+	theme: Theme,
 }
 
 impl Label
 {
-	pub fn new(w: f32, h: f32, text: &str) -> Self
+	pub fn new(w: f32, h: f32, text: &str, theme: Theme) -> Self
 	{
-		Self::new_align(w, h, text, FontAlign::Centre)
+		Self::new_align(w, h, text, FontAlign::Centre, theme)
 	}
 
-	pub fn new_align(w: f32, h: f32, text: &str, align: FontAlign) -> Self
+	pub fn new_align(w: f32, h: f32, text: &str, align: FontAlign, theme: Theme) -> Self
 	{
 		Self {
 			loc: Point2::new(0., 0.),
 			size: Vector2::new(w, h),
 			text: text.into(),
 			align: align,
+			theme: theme,
 		}
 	}
 
@@ -587,7 +618,7 @@ impl Label
 		};
 		state.core.draw_text(
 			state.ui_font(),
-			LABEL,
+			self.theme.label,
 			x,
 			self.loc.y - state.ui_font().get_line_height() as f32 / 2.,
 			self.align,
@@ -714,11 +745,12 @@ pub struct WidgetList<ActionT>
 	widgets: Vec<Vec<Widget<ActionT>>>,
 	cur_selection: (usize, usize),
 	pos: Point2<f32>,
+	theme: Theme,
 }
 
 impl<ActionT: Action + Clone> WidgetList<ActionT>
 {
-	pub fn new(widgets: &[&[Widget<ActionT>]]) -> Self
+	pub fn new(widgets: &[&[Widget<ActionT>]], theme: Theme) -> Self
 	{
 		let mut new_widgets = Vec::with_capacity(widgets.len());
 		let mut cur_selection = None;
@@ -745,6 +777,7 @@ impl<ActionT: Action + Clone> WidgetList<ActionT>
 			pos: Point2::new(0., 0.),
 			widgets: new_widgets,
 			cur_selection: cur_selection.expect("No selectable widgets?"),
+			theme: theme,
 		}
 	}
 
@@ -863,8 +896,8 @@ impl<ActionT: Action + Clone> WidgetList<ActionT>
 	pub fn resize(&mut self, state: &hack_state::HackState)
 	{
 		let s = state.gfx_options.ui_scale;
-		let w_space = s * HORIZ_SPACE;
-		let h_space = s * VERT_SPACE;
+		let w_space = s * self.theme.horiz_space;
+		let h_space = s * self.theme.vert_space;
 		let cx = self.pos.x;
 		let cy = self.pos.y;
 

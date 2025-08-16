@@ -34,19 +34,16 @@ pub trait LoopState: Sized
 #[derive(Copy, Clone, Debug)]
 pub struct Options
 {
-	depth_buffer: bool,
+	pub depth_buffer: bool,
 }
-
-pub const OPTIONS: Options = Options {
-	depth_buffer: false,
-};
 
 impl Options
 {
-	pub fn depth_buffer(mut self, value: bool) -> Self
+	pub fn new() -> Self
 	{
-		self.depth_buffer = value;
-		self
+		Self {
+			depth_buffer: false,
+		}
 	}
 }
 

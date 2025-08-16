@@ -152,8 +152,11 @@ impl game_loop::LoopState for LoopState
 fn real_main() -> Result<()>
 {
 	let mut state = LoopState::new()?;
-	let options = game_loop::OPTIONS.depth_buffer(true);
+
+	let mut options = game_loop::Options::new();
+	options.depth_buffer = true;
 	game_loop::game_loop(&mut state, options)?;
+
 	state.game_state.sfx.fade_out(&state.game_state.hs.core);
 	Ok(())
 }
