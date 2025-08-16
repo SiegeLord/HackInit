@@ -5,6 +5,7 @@ pub mod atlas;
 pub mod controls;
 pub mod deferred;
 pub mod error;
+pub mod game_loop;
 pub mod hack_state;
 pub mod scene;
 pub mod sfx;

@@ -3,6 +3,19 @@ use std::{error, fmt};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait ResultHelper<T>
+{
+	fn into_slhack(self) -> slhack::error::Result<T>;
+}
+
+impl<T> ResultHelper<T> for Result<T>
+{
+	fn into_slhack(self) -> slhack::error::Result<T>
+	{
+		self.map_err(Into::into)
+	}
+}
+
 pub struct Error
 {
 	message: String,

@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{Result, ResultHelper};
 use crate::utils::DT;
 use crate::{components as comps, game_state, ui, utils};
 use allegro::*;
@@ -300,11 +300,10 @@ impl Map
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
 
-		let material_mapper = |_material: &scene::Material<game_state::MaterialKind>,
-		                       texture_name: &str|
-		 -> slhack::error::Result<&Bitmap> {
-			state.get_bitmap(texture_name).map_err(Into::into)
-		};
+		let material_mapper =
+			|_material: &scene::Material<game_state::MaterialKind>,
+			 texture_name: &str|
+			 -> slhack::error::Result<&Bitmap> { state.get_bitmap(texture_name).into_slhack() };
 
 		state
 			.hs
@@ -388,7 +387,7 @@ impl Map
 			if let Ok(scene) = state.get_scene("data/sphere.glb")
 			{
 				scene.draw(&state.hs.core, &state.hs.prim, |_, s| {
-					state.get_bitmap(s).map_err(Into::into)
+					state.get_bitmap(s).into_slhack()
 				});
 			}
 		}

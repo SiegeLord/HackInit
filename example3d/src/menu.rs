@@ -23,6 +23,7 @@ impl Menu
 	pub fn new(state: &mut game_state::GameState) -> Result<Self>
 	{
 		state.hs.paused = false;
+		state.hs.hide_mouse = true;
 		state.sfx.cache_sample("data/ui1.ogg")?;
 		state.sfx.cache_sample("data/ui2.ogg")?;
 		state.cache_sprite("data/title.cfg")?;
