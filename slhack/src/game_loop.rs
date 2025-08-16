@@ -3,28 +3,16 @@ use crate::{hack_state, utils};
 
 use allegro::*;
 
-pub trait Screen<GameStateT>: Sized
+pub trait LoopState: Sized
 {
-	type NextScreen;
-	const INIT_SCREEN: Self::NextScreen;
-
-	fn new(next_screen: Self::NextScreen, game_state: &mut GameStateT) -> Result<Option<Self>>;
-	fn draw(&mut self, game_state: &mut GameStateT) -> Result<()>;
-	fn input(
-		&mut self, event: &Event, game_state: &mut GameStateT,
-	) -> Result<Option<Self::NextScreen>>;
-	fn logic(&mut self, game_state: &mut GameStateT) -> Result<Option<Self::NextScreen>>;
-	fn resize(&mut self, game_state: &mut GameStateT) -> Result<()>;
-}
-
-pub trait GameState: Sized
-{
-	type ScreenT: Screen<Self>;
-
 	fn hs(&mut self) -> &mut hack_state::HackState;
 	fn gfx_options(&self) -> &hack_state::GfxOptions;
 	fn resize_display(&mut self) -> Result<()>;
 
+	fn init(&mut self) -> Result<()>
+	{
+		Ok(())
+	}
 	fn draw(&mut self) -> Result<()>
 	{
 		Ok(())
@@ -36,6 +24,10 @@ pub trait GameState: Sized
 	fn logic(&mut self) -> Result<()>
 	{
 		Ok(())
+	}
+	fn step(&mut self) -> Result<bool>
+	{
+		Ok(false)
 	}
 }
 
@@ -58,7 +50,7 @@ impl Options
 	}
 }
 
-pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options) -> Result<()>
+pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options) -> Result<()>
 {
 	let mut flags = OPENGL | OPENGL_3_0 | PROGRAMMABLE_PIPELINE;
 
@@ -94,7 +86,7 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 	gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
 
 	let scale_shader = utils::load_shader(state.hs().display_mut(), "data/scale")?;
-	state.resize_display()?;
+	state.init()?;
 
 	let timer = Timer::new(&state.hs().core, utils::DT as f64)
 		.map_err(|_| "Couldn't create timer".to_string())?;
@@ -143,9 +135,6 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 		hs.core.grab_mouse(hs.display()).ok();
 	}
 
-	let mut cur_screen =
-		GameStateT::ScreenT::new(GameStateT::ScreenT::INIT_SCREEN, state)?.unwrap();
-
 	timer.start();
 	while !quit
 	{
@@ -159,7 +148,6 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 				old_ui_scale = state.gfx_options().ui_scale;
 				old_frac_scale = state.gfx_options().frac_scale;
 				state.resize_display()?;
-				cur_screen.resize(state)?;
 			}
 
 			let frame_start = state.hs().core.get_time();
@@ -177,7 +165,6 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 
 			state.hs().alpha = (frame_start - logic_end) as f32 / utils::DT;
 			state.draw()?;
-			cur_screen.draw(state)?;
 
 			if state.hs().fixed_buffer_size.is_some()
 			{
@@ -237,7 +224,6 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 		state.hs().game_ui_controls.decode_event(&event);
 		state.hs().menu_controls.decode_event(&event);
 		state.input(&event)?;
-		let mut next_screen = cur_screen.input(&event, state)?;
 		state.hs().game_ui_controls.clear_action_states();
 		state.hs().menu_controls.clear_action_states();
 
@@ -307,10 +293,7 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 					continue;
 				}
 
-				if next_screen.is_none()
-				{
-					next_screen = cur_screen.logic(state)?;
-				}
+				state.logic()?;
 
 				if state.hs().hide_mouse && switched_in
 				{
@@ -342,7 +325,6 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 				}
 
 				logics_without_draw += 1;
-				state.logic()?;
 
 				if !state.hs().paused
 				{
@@ -353,17 +335,7 @@ pub fn game_loop<GameStateT: GameState>(state: &mut GameStateT, options: Options
 			_ => (),
 		}
 
-		if let Some(next_screen) = next_screen
-		{
-			if let Some(new_screen) = GameStateT::ScreenT::new(next_screen, state)?
-			{
-				cur_screen = new_screen;
-			}
-			else
-			{
-				quit = true;
-			}
-		}
+		quit |= !state.step()?;
 	}
 	Ok(())
 }
