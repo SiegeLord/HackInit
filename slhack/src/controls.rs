@@ -615,16 +615,18 @@ pub struct ControlsHandler<ActionT: Action>
 	controls: Controls<ActionT>,
 	input_to_action: BTreeMap<Input, ActionT>,
 	input_state: HashMap<Input, InputState>,
+	thumb_dead_zone: f32,
 }
 
 impl<ActionT: Action> ControlsHandler<ActionT>
 {
-	pub fn new(controls: Controls<ActionT>) -> Self
+	pub fn new(controls: Controls<ActionT>, thumb_dead_zone: f32) -> Self
 	{
 		let mut ret = Self {
 			controls: controls,
 			input_to_action: BTreeMap::new(),
 			input_state: HashMap::new(),
+			thumb_dead_zone: thumb_dead_zone,
 		};
 		ret.update_derived();
 		ret
@@ -787,7 +789,7 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				axis, stick, pos, ..
 			} =>
 			{
-				let dead = 0.25;
+				let dead = self.thumb_dead_zone;
 				if *pos > dead
 				{
 					if let Some(state) = self

@@ -47,6 +47,7 @@ pub struct HackState
 	pub buffer2: Option<Bitmap>,
 
 	pub alpha: f32,
+	pub time: f64,
 
 	// Has to be last!
 	pub display: Option<Display>,
@@ -84,6 +85,7 @@ impl HackState
 			prim: prim,
 			image: image,
 			tick: 0,
+			time: 0.0,
 			font: font,
 			ttf: ttf,
 			paused: false,
@@ -115,12 +117,26 @@ impl HackState
 
 	pub fn buffer_width(&self) -> f32
 	{
-		self.buffer1().get_width() as f32
+		if let Some(buffer) = self.buffer1.as_ref()
+		{
+			buffer.get_width() as f32
+		}
+		else
+		{
+			self.display.as_ref().unwrap().get_width() as f32
+		}
 	}
 
 	pub fn buffer_height(&self) -> f32
 	{
-		self.buffer1().get_height() as f32
+		if let Some(buffer) = self.buffer1.as_ref()
+		{
+			buffer.get_height() as f32
+		}
+		else
+		{
+			self.display.as_ref().unwrap().get_height() as f32
+		}
 	}
 
 	pub fn ui_font(&self) -> &Font
@@ -178,7 +194,7 @@ impl HackState
 
 	pub fn time(&self) -> f64
 	{
-		self.tick as f64 * utils::DT as f64
+		self.time
 	}
 
 	pub fn set_display(&mut self, display: Display)

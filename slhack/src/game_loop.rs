@@ -35,6 +35,7 @@ pub trait LoopState: Sized
 pub struct Options
 {
 	pub depth_buffer: bool,
+	pub dt: f64,
 }
 
 impl Options
@@ -43,6 +44,7 @@ impl Options
 	{
 		Self {
 			depth_buffer: false,
+			dt: 1.0 / 60.0,
 		}
 	}
 }
@@ -85,7 +87,7 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 	let scale_shader = utils::load_shader(state.hs().display_mut(), "data/scale")?;
 	state.init()?;
 
-	let timer = Timer::new(&state.hs().core, utils::DT as f64)
+	let timer = Timer::new(&state.hs().core, options.dt)
 		.map_err(|_| "Couldn't create timer".to_string())?;
 
 	let queue =
@@ -167,7 +169,7 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 					.set_target_bitmap(Some(hs.display().get_backbuffer()));
 			}
 
-			state.hs().alpha = (frame_start - logic_end) as f32 / utils::DT;
+			state.hs().alpha = ((frame_start - logic_end) / options.dt) as f32;
 			state.draw()?;
 
 			if state.hs().fixed_buffer_size.is_some()
@@ -332,7 +334,9 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 
 				if !state.hs().paused
 				{
-					state.hs().tick += 1;
+					let hs = state.hs();
+					hs.tick += 1;
+					hs.time = hs.tick as f64 * options.dt;
 				}
 				logic_end = state.hs().core.get_time();
 			}
