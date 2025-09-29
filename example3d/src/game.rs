@@ -1,5 +1,5 @@
 use crate::error::{Result, ResultHelper};
-use crate::utils::DT;
+use crate::game_state::DT;
 use crate::{components as comps, game_state, ui, utils};
 use allegro::*;
 use allegro_font::*;
@@ -164,6 +164,7 @@ impl Map
 		game_state::cache_scene(state, "data/test_level_sprytile.glb")?;
 		state.cache_bitmap("data/level_lightmap.png")?;
 		game_state::cache_scene(state, "data/sphere.glb")?;
+		game_state::cache_scene(state, "data/test.obj")?;
 
 		let level_scene = state.get_scene("data/test_level_sprytile.glb").unwrap();
 		for object in &level_scene.objects
@@ -189,6 +190,13 @@ impl Map
 			},
 		));
 
+		world.spawn((
+			comps::Position::new(Point3::new(5.5, 1.5, -2.)),
+			comps::Scene {
+				scene: "data/test.obj".to_string(),
+			},
+		));
+
 		Ok(Self {
 			world: world,
 			camera_target: Point3::origin(),
@@ -200,7 +208,7 @@ impl Map
 	{
 		let mut to_die = vec![];
 
-		let t = state.hs.time() / 3.;
+		let t = -(state.hs.time() / 3.);
 		self.camera_target = Point3::new(20. * t.cos() as f32 - 2., 1., 20. * t.sin() as f32 - 1.);
 
 		// Position snapshotting.

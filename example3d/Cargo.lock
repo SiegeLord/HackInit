@@ -51,8 +51,6 @@ dependencies = [
 [[package]]
 name = "allegro"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e65bab30829c2a0cc00a06385c957d41ceb09563e666c585b52fecb94fdeec72"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -63,8 +61,6 @@ dependencies = [
 [[package]]
 name = "allegro-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fa79831a10a1f8f1e470133ea1022a001d339f8ec93cc1569d52b3dd3f22e85"
 dependencies = [
  "allegro_util",
  "libc",
@@ -73,8 +69,6 @@ dependencies = [
 [[package]]
 name = "allegro_acodec"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2c1214b7bb0dacf2f3044c544b19f9f3aa93cdf4b99ae8658264d3707c26c10"
 dependencies = [
  "allegro",
  "allegro_acodec-sys",
@@ -84,8 +78,6 @@ dependencies = [
 [[package]]
 name = "allegro_acodec-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaa1690e67874f7b1f92fe89aa99870b43490b6ec9f6b61bfe438299973fdd84"
 dependencies = [
  "allegro_util",
  "libc",
@@ -94,8 +86,6 @@ dependencies = [
 [[package]]
 name = "allegro_audio"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede760f6c51a44a0bf95a71e65fc9109bc0af2cd55afee3d3f58158a49de7760"
 dependencies = [
  "allegro",
  "allegro_audio-sys",
@@ -106,8 +96,6 @@ dependencies = [
 [[package]]
 name = "allegro_audio-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e3905d90e6193e5d964d1d538043b3d2f3a86378055bd575e727d4c995f91ef"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -117,8 +105,6 @@ dependencies = [
 [[package]]
 name = "allegro_color"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d00ab69ea03cc246462c9ac43351635ed2b51f7819508b7da8bdce63598a9acd"
 dependencies = [
  "allegro",
  "allegro_color-sys",
@@ -129,8 +115,6 @@ dependencies = [
 [[package]]
 name = "allegro_color-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad06db51fb7c65067db368bd7f8662bd0535988d80105a58b420296815ea7e50"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -140,8 +124,6 @@ dependencies = [
 [[package]]
 name = "allegro_dialog"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7f0b5bac3db7cfeaee097b963cc18bf6806bccc67768977e771ea053790d8f"
 dependencies = [
  "allegro",
  "allegro_dialog-sys",
@@ -152,8 +134,6 @@ dependencies = [
 [[package]]
 name = "allegro_dialog-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f125191bb33a96b4bc52fb80d5bb04a1a81a56666397d3dc528b857b92c3295b"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -163,8 +143,6 @@ dependencies = [
 [[package]]
 name = "allegro_font"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d289022ac252ab52596c45b9dea4c3ba92878a7fa5b4e43a45d42cfe314841f9"
 dependencies = [
  "allegro",
  "allegro-sys",
@@ -176,8 +154,6 @@ dependencies = [
 [[package]]
 name = "allegro_font-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6824591761714e74bc69d1e87880af4800e673760c5cb677f4ee3e48ca85e0cf"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -187,8 +163,6 @@ dependencies = [
 [[package]]
 name = "allegro_image"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3053d4d014531f633a6eda90ce84aa1f7170f18750acaf75ff17aaa8950e284d"
 dependencies = [
  "allegro",
  "allegro_image-sys",
@@ -199,8 +173,6 @@ dependencies = [
 [[package]]
 name = "allegro_image-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2421ab30604deb1fb1c5a2b9fcb1e5e67f8f7d0d5e9bfebbf66b6959b079445"
 dependencies = [
  "allegro_util",
  "libc",
@@ -209,8 +181,6 @@ dependencies = [
 [[package]]
 name = "allegro_primitives"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b7cb8e6a2685cd9915c01203a845c28f1404b3748d40710dea420a7b8e4f50c"
 dependencies = [
  "allegro",
  "allegro-sys",
@@ -222,8 +192,6 @@ dependencies = [
 [[package]]
 name = "allegro_primitives-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b75d2b66a8ee17ebf58bc9b629644ec0a6972ae2eafc3f47bd68014ceadc7887"
 dependencies = [
  "allegro-sys",
  "allegro_util",
@@ -233,8 +201,6 @@ dependencies = [
 [[package]]
 name = "allegro_ttf"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23037dd46fb990b8f3b8c7287746395a38fd3669eef19c76f45cb64de185642f"
 dependencies = [
  "allegro",
  "allegro_font",
@@ -246,8 +212,6 @@ dependencies = [
 [[package]]
 name = "allegro_ttf-sys"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56b528dab1676dbe1af60a0444d7190fccbe57c29d8f9c5bb8d4278c95d2ef94"
 dependencies = [
  "allegro-sys",
  "allegro_font-sys",
@@ -258,8 +222,6 @@ dependencies = [
 [[package]]
 name = "allegro_util"
 version = "0.0.49"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "601172e17aa763b451484e7acc8a04b2151ca3c46cd6448c4572f954a9b6d8bd"
 dependencies = [
  "libc",
 ]
@@ -398,6 +360,102 @@ dependencies = [
  "cc",
  "libc",
 ]
+
+[[package]]
+name = "glam"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "333928d5eb103c5d4050533cec0384302db6be8ef7d3cebd30ec6a35350353da"
+
+[[package]]
+name = "glam"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3abb554f8ee44336b72d522e0a7fe86a29e09f839a36022fa869a7dfe941a54b"
+
+[[package]]
+name = "glam"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4126c0479ccf7e8664c36a2d719f5f2c140fbb4f9090008098d2c291fa5b3f16"
+
+[[package]]
+name = "glam"
+version = "0.17.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e01732b97afd8508eee3333a541b9f7610f454bb818669e66e90f5f57c93a776"
+
+[[package]]
+name = "glam"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "525a3e490ba77b8e326fb67d4b44b4bd2f920f44d4cc73ccec50adc68e3bee34"
+
+[[package]]
+name = "glam"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b8509e6791516e81c1a630d0bd7fbac36d2fa8712a9da8662e716b52d5051ca"
+
+[[package]]
+name = "glam"
+version = "0.20.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f43e957e744be03f5801a55472f593d43fabdebf25a4585db250f04d86b1675f"
+
+[[package]]
+name = "glam"
+version = "0.21.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "518faa5064866338b013ff9b2350dc318e14cc4fcd6cb8206d7e7c9886c98815"
+
+[[package]]
+name = "glam"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12f597d56c1bd55a811a1be189459e8fad2bbc272616375602443bdfb37fa774"
+
+[[package]]
+name = "glam"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e4afd9ad95555081e109fe1d21f2a30c691b5f0919c67dfa690a2e1eb6bd51c"
+
+[[package]]
+name = "glam"
+version = "0.24.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
+
+[[package]]
+name = "glam"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
+
+[[package]]
+name = "glam"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e05e7e6723e3455f4818c7b26e855439f7546cf617ef669d1adedb8669e5cb9"
+
+[[package]]
+name = "glam"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "779ae4bf7e8421cf91c0b3b64e7e8b40b862fba4d393f59150042de7c4965a94"
+
+[[package]]
+name = "glam"
+version = "0.29.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8babf46d4c1c9d92deac9f7be466f76dfc4482b6452fc5024b5e8daf6ffeb3ee"
+
+[[package]]
+name = "glam"
+version = "0.30.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e12d847aeb25f41be4c0ec9587d624e9cd631bc007a8fd7ce3f5851e064c6460"
 
 [[package]]
 name = "gltf"
@@ -560,11 +618,27 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.31.4"
+version = "0.34.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20bd243ab3dbb395b39ee730402d2e5405e448c75133ec49cc977762c4cba3d1"
+checksum = "c4d5b3eff5cd580f93da45e64715e8c20a3996342f1e466599cf7a267a0c2f5f"
 dependencies = [
  "approx",
+ "glam 0.14.0",
+ "glam 0.15.2",
+ "glam 0.16.0",
+ "glam 0.17.3",
+ "glam 0.18.0",
+ "glam 0.19.0",
+ "glam 0.20.5",
+ "glam 0.21.3",
+ "glam 0.22.0",
+ "glam 0.23.0",
+ "glam 0.24.2",
+ "glam 0.25.0",
+ "glam 0.27.0",
+ "glam 0.28.0",
+ "glam 0.29.3",
+ "glam 0.30.8",
  "matrixmultiply",
  "nalgebra-macros",
  "num-complex",
@@ -576,13 +650,13 @@ dependencies = [
 
 [[package]]
 name = "nalgebra-macros"
-version = "0.1.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01fcc0b8149b4632adc89ac3b7b31a12fb6099a0317a4eb2ebff574ef7de7218"
+checksum = "973e7178a678cfd059ccec50887658d482ce16b0aa9da3888ddeab5cd5eb4889"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.43",
 ]
 
 [[package]]
@@ -760,9 +834,9 @@ dependencies = [
 
 [[package]]
 name = "simba"
-version = "0.7.3"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3fd720c48c53cace224ae62bef1bbff363a70c68c4802a78b5cc6159618176"
+checksum = "c99284beb21666094ba2b75bbceda012e610f5479dfcc2d6e2426f53197ffd95"
 dependencies = [
  "approx",
  "num-complex",
@@ -802,6 +876,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "slr_config",
+ "wavefront_obj",
 ]
 
 [[package]]
@@ -882,6 +957,12 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
+name = "wavefront_obj"
+version = "11.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "934504ea79927c25f18e980053b64269490284129b327334fc2591daf1539b9c"
 
 [[package]]
 name = "wide"

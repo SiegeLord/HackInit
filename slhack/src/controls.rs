@@ -583,6 +583,7 @@ pub struct Controls<ActionT: Action>
 {
 	action_to_inputs: BTreeMap<ActionT, [Option<Input>; 2]>,
 	mouse_sensitivity: f32,
+	thumb_dead_zone: f32,
 }
 
 impl<ActionT: Action> Controls<ActionT>
@@ -592,6 +593,7 @@ impl<ActionT: Action> Controls<ActionT>
 		Self {
 			action_to_inputs: action_to_inputs,
 			mouse_sensitivity: 0.1,
+			thumb_dead_zone: 0.25,
 		}
 	}
 
@@ -615,18 +617,16 @@ pub struct ControlsHandler<ActionT: Action>
 	controls: Controls<ActionT>,
 	input_to_action: BTreeMap<Input, ActionT>,
 	input_state: HashMap<Input, InputState>,
-	thumb_dead_zone: f32,
 }
 
 impl<ActionT: Action> ControlsHandler<ActionT>
 {
-	pub fn new(controls: Controls<ActionT>, thumb_dead_zone: f32) -> Self
+	pub fn new(controls: Controls<ActionT>) -> Self
 	{
 		let mut ret = Self {
 			controls: controls,
 			input_to_action: BTreeMap::new(),
 			input_state: HashMap::new(),
-			thumb_dead_zone: thumb_dead_zone,
 		};
 		ret.update_derived();
 		ret
@@ -789,7 +789,7 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				axis, stick, pos, ..
 			} =>
 			{
-				let dead = self.thumb_dead_zone;
+				let dead = self.controls.thumb_dead_zone;
 				if *pos > dead
 				{
 					if let Some(state) = self

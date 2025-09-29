@@ -14,6 +14,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::{fmt, path, sync};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const DT: f32 = 1. / 60.;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[repr(i32)]

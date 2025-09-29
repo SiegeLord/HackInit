@@ -1,4 +1,3 @@
-#![feature(float_next_up_down)]
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
@@ -155,6 +154,7 @@ fn real_main() -> Result<()>
 
 	let mut options = game_loop::Options::new();
 	options.depth_buffer = true;
+	options.dt = game_state::DT as f64;
 	game_loop::game_loop(&mut state, options)?;
 
 	state.game_state.sfx.fade_out(&state.game_state.hs.core);

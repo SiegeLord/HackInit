@@ -94,3 +94,27 @@ impl From<gltf::Error> for Error
 		}
 	}
 }
+
+impl From<std::io::Error> for Error
+{
+	fn from(error: std::io::Error) -> Self
+	{
+		Self {
+			message: format!("{}", error),
+			inner: Some(Box::new(error)),
+			backtrace: Backtrace::capture(),
+		}
+	}
+}
+
+impl From<wavefront_obj::ParseError> for Error
+{
+	fn from(error: wavefront_obj::ParseError) -> Self
+	{
+		Self {
+			message: format!("{}", error),
+			inner: Some(Box::new(error)),
+			backtrace: Backtrace::capture(),
+		}
+	}
+}

@@ -80,7 +80,126 @@ pub struct Scene<MaterialKindT: MaterialKind>
 
 impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 {
-	pub fn load(display: &mut Display, prim: &PrimitivesAddon, gltf_file: &str) -> Result<Self>
+	pub fn load(display: &mut Display, prim: &PrimitivesAddon, file: &str) -> Result<Self>
+	{
+		if file.ends_with("obj")
+		{
+			Self::load_obj(display, prim, file)
+		}
+		else
+		{
+			Self::load_gltf(display, prim, file)
+		}
+	}
+
+	pub fn load_obj(display: &mut Display, prim: &PrimitivesAddon, obj_file: &str) -> Result<Self>
+	{
+		let obj_str = std::fs::read_to_string(obj_file)?;
+		let obj_set = wavefront_obj::obj::parse(obj_str)?;
+
+		let mut objects = vec![];
+		for obj in obj_set.objects
+		{
+			if obj.name == "Navmesh"
+			{
+				unimplemented!();
+			}
+
+			let mut meshes = vec![];
+			for geom in &obj.geometry
+			{
+				let mut vtx_map = HashMap::new();
+				let mut vtxs = vec![];
+				let mut idxs = vec![];
+
+				for shape in &geom.shapes
+				{
+					if let wavefront_obj::obj::Primitive::Triangle(idx1, idx2, idx3) =
+						shape.primitive
+					{
+						for idx in [idx1, idx2, idx3]
+						{
+							let vtx_idx = vtx_map.entry(idx).or_insert_with(|| {
+								let pos = obj.vertices[idx.0];
+								let uv = idx.1.map(|idx| obj.tex_vertices[idx]).unwrap_or(
+									wavefront_obj::obj::TVertex {
+										u: 0.,
+										v: 0.,
+										w: 0.,
+									},
+								);
+								let norm = idx.2.map(|idx| obj.normals[idx]).unwrap_or(
+									wavefront_obj::obj::Normal {
+										x: 0.,
+										y: 0.,
+										z: 0.,
+									},
+								);
+								let vtx_idx = vtxs.len();
+								vtxs.push(MeshVertex {
+									x: pos.x as f32,
+									y: pos.y as f32,
+									z: pos.z as f32,
+									u: uv.u as f32,
+									v: uv.v as f32,
+									u2: 0.,
+									v2: 0.,
+									nx: norm.x as f32,
+									ny: norm.y as f32,
+									nz: norm.z as f32,
+									color: Color::from_rgb_f(1., 1., 1.),
+								});
+								vtx_idx
+							});
+							idxs.push(*vtx_idx as i32);
+						}
+					}
+					else
+					{
+						unimplemented!();
+					}
+				}
+				let material = geom
+					.material_name
+					.as_ref()
+					.map(|name| {
+						(
+							name.to_string(),
+							utils::load_config(&format!("data/{}.cfg", name)),
+						)
+					})
+					.map_or(Ok(None), |(name, desc)| {
+						desc.map(|desc| {
+							Some(Material {
+								name: name,
+								desc: desc,
+							})
+						})
+					})?;
+
+				let (vertex_buffer, index_buffer) = create_buffers(display, prim, &vtxs, &idxs)?;
+
+				meshes.push(Mesh {
+					vtxs: vtxs,
+					idxs: idxs,
+					vertex_buffer: vertex_buffer,
+					index_buffer: index_buffer,
+					material: material,
+				});
+			}
+
+			let object = Object {
+				name: obj.name.clone(),
+				position: Point3::origin(),
+				kind: ObjectKind::MultiMesh { meshes: meshes },
+			};
+			objects.push(object);
+		}
+		Ok(Self { objects: objects })
+	}
+
+	pub fn load_gltf(display: &mut Display, prim: &PrimitivesAddon, gltf_file: &str)
+	-> Result<Self>
 	{
 		let (document, buffers, _) = gltf::import(gltf_file)?;
 		let mut objects = vec![];
