@@ -9,33 +9,33 @@ authors = ["SiegeLord <slabode@aim.com>"]
 
 slhack = { path = "../slhack" }
 
-allegro-sys = { version="0.0.49" }
-allegro = { version="0.0.49", features = ["unstable"] }
-allegro_dialog = { version="0.0.49" }
-allegro_image = { version="0.0.49" }
-allegro_font = { version="0.0.49" }
-allegro_ttf = { version="0.0.49" }
-allegro_acodec = { version="0.0.49" }
-allegro_audio = { version="0.0.49" }
-allegro_primitives = { version="0.0.49" }
-allegro_color = { version="0.0.49" }
+#allegro-sys = { version="0.0.49" }
+#allegro = { version="0.0.49", features = ["unstable"] }
+#allegro_dialog = { version="0.0.49" }
+#allegro_image = { version="0.0.49" }
+#allegro_font = { version="0.0.49" }
+#allegro_ttf = { version="0.0.49" }
+#allegro_acodec = { version="0.0.49" }
+#allegro_audio = { version="0.0.49" }
+#allegro_primitives = { version="0.0.49" }
+#allegro_color = { version="0.0.49" }
 
-#allegro-sys = { path = "/home/siege/Projects/RustAllegro/allegro-sys" }
-#allegro = { path = "/home/siege/Projects/RustAllegro/allegro" }
-#allegro_dialog = { path = "/home/siege/Projects/RustAllegro/allegro_dialog" }
-#allegro_image = { path = "/home/siege/Projects/RustAllegro/allegro_image" }
-#allegro_font = { path = "/home/siege/Projects/RustAllegro/allegro_font" }
-#allegro_ttf = { path = "/home/siege/Projects/RustAllegro/allegro_ttf" }
-#allegro_acodec = { path = "/home/siege/Projects/RustAllegro/allegro_acodec" }
-#allegro_audio = { path = "/home/siege/Projects/RustAllegro/allegro_audio" }
-#allegro_primitives = { path = "/home/siege/Projects/RustAllegro/allegro_primitives" }
-#allegro_color = { path = "/home/siege/Projects/RustAllegro/allegro_color" }
+allegro-sys = { path = "/home/siege/Projects/RustAllegro/allegro-sys" }
+allegro = { path = "/home/siege/Projects/RustAllegro/allegro" }
+allegro_dialog = { path = "/home/siege/Projects/RustAllegro/allegro_dialog" }
+allegro_image = { path = "/home/siege/Projects/RustAllegro/allegro_image" }
+allegro_font = { path = "/home/siege/Projects/RustAllegro/allegro_font" }
+allegro_ttf = { path = "/home/siege/Projects/RustAllegro/allegro_ttf" }
+allegro_acodec = { path = "/home/siege/Projects/RustAllegro/allegro_acodec" }
+allegro_audio = { path = "/home/siege/Projects/RustAllegro/allegro_audio" }
+allegro_primitives = { path = "/home/siege/Projects/RustAllegro/allegro_primitives" }
+allegro_color = { path = "/home/siege/Projects/RustAllegro/allegro_color" }
 
 bimap = { version="0.6.2", features = ["serde"] }
 hecs = "0.10.5"
 slr_config = "0.0.22"
 #slr_config = { path = "/home/siege/Projects/SLRConfig/slr_config" }
-nalgebra = "0.31.1"
+nalgebra = "0.34.0"
 rand = "0.8.5"
 serde = "1.0.142"
 serde_derive = "1.0.142"

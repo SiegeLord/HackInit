@@ -95,7 +95,8 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 	pub fn load_obj(display: &mut Display, prim: &PrimitivesAddon, obj_file: &str) -> Result<Self>
 	{
 		let obj_str = std::fs::read_to_string(obj_file)?;
-		let obj_set = wavefront_obj::obj::parse(obj_str)?;
+		let obj_set = wavefront_obj::obj::parse(obj_str)
+			.map_err(|e| format!("Error while reading {}: {}", obj_file, e.to_string()))?;
 
 		let mut objects = vec![];
 		for obj in obj_set.objects

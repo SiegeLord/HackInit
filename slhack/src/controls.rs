@@ -581,9 +581,9 @@ impl InputState
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Controls<ActionT: Action>
 {
-	action_to_inputs: BTreeMap<ActionT, [Option<Input>; 2]>,
-	mouse_sensitivity: f32,
-	thumb_dead_zone: f32,
+	pub action_to_inputs: BTreeMap<ActionT, [Option<Input>; 2]>,
+	pub mouse_sensitivity: f32,
+	pub thumb_dead_zone: f32,
 }
 
 impl<ActionT: Action> Controls<ActionT>
