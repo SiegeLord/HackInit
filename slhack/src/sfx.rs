@@ -242,7 +242,7 @@ impl Sfx
 	) -> Result<()>
 	{
 		let diff = sound_pos - camera_pos;
-		let right = camera_rot * Vector3::x();
+		let right = camera_rot * -Vector3::x();
 		let horiz = -diff.dot(&right);
 
 		self.cache_sample(name)?;
