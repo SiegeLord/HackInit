@@ -20,8 +20,8 @@ pub struct Sfx
 	acodec: AcodecAddon,
 	sink: Sink,
 	music_stream: Option<AudioStream>,
-	music: (String, f32),
-	next_music: Option<(String, f32)>,
+	music: (String, f32, Playmode),
+	next_music: Option<(String, f32, Playmode)>,
 	time_to_next_music: f64,
 	music_fade_factor: f32,
 	sample_instances: HashMap<String, Vec<SampleInstance>>,
@@ -52,7 +52,7 @@ impl Sfx
 			exclusive_instance: None,
 			exclusive_sounds: vec![],
 			samples: HashMap::new(),
-			music: ("".into(), 1.0),
+			music: ("".into(), 1.0, Playmode::Loop),
 			time_to_next_music: 0.,
 			music_fade_factor: 1.0,
 			next_music: None,
@@ -100,7 +100,7 @@ impl Sfx
 		}
 		if let Some(ref stream) = self.music_stream
 		{
-			if !stream.get_playing()
+			if !stream.get_playing() && self.music.2 != Playmode::Once
 			{
 				self.start_music()?;
 			}
@@ -279,19 +279,25 @@ impl Sfx
 
 	pub fn play_music(&mut self, music: &str, music_volume_factor: f32, core: &Core)
 	{
-		self.next_music = Some((music.to_string(), music_volume_factor));
+		self.next_music = Some((music.to_string(), music_volume_factor, Playmode::Loop));
+		self.time_to_next_music = core.get_time() + FADEOUT_TIME;
+	}
+
+	pub fn play_music_once(&mut self, music: &str, music_volume_factor: f32, core: &Core)
+	{
+		self.next_music = Some((music.to_string(), music_volume_factor, Playmode::Once));
 		self.time_to_next_music = core.get_time() + FADEOUT_TIME;
 	}
 
 	fn start_music(&mut self) -> Result<()>
 	{
-		let mut new_stream = AudioStream::load(&self.audio, &self.music.0)
-			.map_err(|_| format!("Couldn't load {}", self.music.0))?;
+		let (ref music, factor, playmode) = self.music;
+		let mut new_stream = AudioStream::load(&self.audio, music)
+			.map_err(|_| format!("Couldn't load {}", music))?;
 		new_stream.attach(&mut self.sink).unwrap();
-		new_stream.set_playmode(Playmode::Loop).unwrap();
-		new_stream
-			.set_gain(self.music_volume * self.music.1)
-			.unwrap();
+
+		new_stream.set_playmode(playmode).unwrap();
+		new_stream.set_gain(self.music_volume * factor).unwrap();
 		self.music_stream = Some(new_stream);
 		Ok(())
 	}

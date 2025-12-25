@@ -32,7 +32,6 @@ pub struct HackState
 	pub paused: bool,
 
 	pub ui_font: Option<Font>,
-	pub gfx_options: GfxOptions,
 	pub game_ui_controls: controls::ControlsHandler<ui::UIAction>,
 	pub menu_controls: controls::ControlsHandler<ui::UIAction>,
 	pub track_mouse: bool,
@@ -45,6 +44,9 @@ pub struct HackState
 	pub display_height: f32,
 	pub buffer1: Option<Bitmap>,
 	pub buffer2: Option<Bitmap>,
+
+	// TODO: GET RID OF THIS
+	pub gfx_options: GfxOptions,
 
 	pub alpha: f32,
 	pub time: f64,
@@ -144,7 +146,7 @@ impl HackState
 		self.ui_font.as_ref().unwrap()
 	}
 
-	pub fn resize_display(&mut self) -> Result<()>
+	pub fn resize_display(&mut self, gfx_options: &GfxOptions) -> Result<()>
 	{
 		let buffer_width;
 		let buffer_height;
@@ -166,21 +168,24 @@ impl HackState
 			(display.get_width() as f32) / (buffer_width as f32),
 			(display.get_height() as f32) / (buffer_height as f32),
 		);
-		if !self.gfx_options.frac_scale
+		if !gfx_options.frac_scale
 		{
 			self.draw_scale = self.draw_scale.floor();
 		}
 
 		if self.buffer1.is_none() || self.fixed_buffer_size.is_none()
 		{
+			let old_depth = self.core.get_new_bitmap_depth();
+			self.core.set_new_bitmap_depth(16);
 			self.buffer1 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
 			self.buffer2 = Some(Bitmap::new(&self.core, buffer_width, buffer_height).unwrap());
+			self.core.set_new_bitmap_depth(old_depth);
 		}
 
 		self.ui_font = Some(utils::load_ttf_font(
 			&self.ttf,
 			"data/Energon.ttf",
-			(-24. * self.gfx_options.ui_scale) as i32,
+			(-24. * gfx_options.ui_scale) as i32,
 		)?);
 		Ok(())
 	}

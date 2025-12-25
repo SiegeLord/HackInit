@@ -259,6 +259,7 @@ impl DeferredRenderer
 			gl::DrawBuffers(attachments.len() as i32, attachments.as_ptr());
 			gl::Enable(gl::CULL_FACE);
 			gl::CullFace(gl::BACK);
+			gl::DepthMask(gl::TRUE);
 		}
 		core.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::Zero);
 		core.set_depth_test(Some(DepthFunction::Less));

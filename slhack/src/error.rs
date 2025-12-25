@@ -26,18 +26,18 @@ impl Error
 		Error::new(message, Some(Box::new(self)))
 	}
 
-	pub fn from_parts(parts: (String, Option<Box<dyn error::Error + 'static>>)) -> Self
+	pub fn from_parts(parts: (String, Option<Box<dyn error::Error + 'static>>, Backtrace)) -> Self
 	{
 		Self {
 			message: parts.0,
 			inner: parts.1,
-			backtrace: Backtrace::capture(),
+			backtrace: parts.2,
 		}
 	}
 
-	pub fn into_parts(self) -> (String, Option<Box<dyn error::Error + 'static>>)
+	pub fn into_parts(self) -> (String, Option<Box<dyn error::Error + 'static>>, Backtrace)
 	{
-		(self.message, self.inner)
+		(self.message, self.inner, self.backtrace)
 	}
 }
 
@@ -110,6 +110,18 @@ impl From<std::io::Error> for Error
 impl From<wavefront_obj::ParseError> for Error
 {
 	fn from(error: wavefront_obj::ParseError) -> Self
+	{
+		Self {
+			message: format!("{}", error),
+			inner: Some(Box::new(error)),
+			backtrace: Backtrace::capture(),
+		}
+	}
+}
+
+impl From<serde_json::Error> for Error
+{
+	fn from(error: serde_json::Error) -> Self
 	{
 		Self {
 			message: format!("{}", error),

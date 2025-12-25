@@ -84,7 +84,7 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 	gl_loader::init_gl();
 	gl::load_with(|symbol| gl_loader::get_proc_address(symbol) as *const _);
 
-	let scale_shader = utils::load_shader(state.hs().display_mut(), "data/scale")?;
+	let scale_shader = utils::load_shader(state.hs().display_mut(), "data/scale", &[])?;
 	state.init()?;
 
 	let timer = Timer::new(&state.hs().core, options.dt)
@@ -144,6 +144,7 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 	timer.start();
 	while !quit
 	{
+		state.hs().gfx_options = state.gfx_options().clone();
 		if queue.is_empty()
 		{
 			if state.hs().display_width != state.hs().display().get_width() as f32

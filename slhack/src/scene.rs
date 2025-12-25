@@ -1,7 +1,9 @@
 use crate::astar;
 use crate::error::Result;
 use crate::utils;
-use nalgebra::{Point3, Vector3};
+use gltf::animation::util::ReadInputs;
+use gltf::animation::util::ReadOutputs;
+use nalgebra::{Point3, UnitQuaternion, Vector3};
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
 
@@ -14,6 +16,16 @@ use std::fmt::Debug;
 pub trait MaterialKind: Debug + Clone + Into<i32> {}
 impl<T: Debug + Clone + Into<i32>> MaterialKind for T {}
 
+fn default_frame_ms() -> f32
+{
+	1.
+}
+
+fn default_num_frames() -> i32
+{
+	1
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MaterialDesc<MaterialKindT: MaterialKind>
 {
@@ -23,6 +35,16 @@ pub struct MaterialDesc<MaterialKindT: MaterialKind>
 	pub material_kind: MaterialKindT,
 	#[serde(default)]
 	pub two_sided: bool,
+	#[serde(default)]
+	pub additive: bool,
+	#[serde(default = "default_frame_ms")]
+	pub frame_ms: f32,
+	#[serde(default = "default_num_frames")]
+	pub num_frames: i32,
+	#[serde(default)]
+	pub frame_dx: i32,
+	#[serde(default)]
+	pub frame_dy: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -48,9 +70,132 @@ pub struct NavNode
 	pub neighbours: Vec<i32>,
 }
 
+#[derive(Clone, Debug)]
+pub struct Position
+{
+	pub pos: Point3<f32>,
+	pub rot: UnitQuaternion<f32>,
+	pub scale: Vector3<f32>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Animation
+{
+	pub start: f64,
+	pub end: f64,
+	pub pos_track: Vec<(f64, Point3<f32>)>,
+	pub rot_track: Vec<(f64, UnitQuaternion<f32>)>,
+	pub scale_track: Vec<(f64, Vector3<f32>)>,
+}
+
+impl Animation
+{
+	fn new(
+		pos_track: Vec<(f64, Point3<f32>)>, rot_track: Vec<(f64, UnitQuaternion<f32>)>,
+		scale_track: Vec<(f64, Vector3<f32>)>,
+	) -> Self
+	{
+		Self {
+			start: 0.,
+			end: 0.,
+			pos_track: pos_track,
+			rot_track: rot_track,
+			scale_track: scale_track,
+		}
+	}
+
+	fn compute_start_end(&mut self)
+	{
+		let mut min = std::f64::MAX;
+		let mut max = std::f64::MIN;
+		let mut valid = false;
+		if !self.pos_track.is_empty()
+		{
+			min = min.min(self.pos_track[0].0);
+			max = max.max(self.pos_track[self.pos_track.len() - 1].0);
+			valid = true;
+		}
+		if !self.rot_track.is_empty()
+		{
+			min = min.min(self.rot_track[0].0);
+			max = max.max(self.rot_track[self.rot_track.len() - 1].0);
+			valid = true;
+		}
+		if !self.scale_track.is_empty()
+		{
+			min = min.min(self.scale_track[0].0);
+			max = max.max(self.scale_track[self.scale_track.len() - 1].0);
+			valid = true;
+		}
+		if valid
+		{
+			self.start = min;
+			self.end = max;
+		}
+	}
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AnimationState
+{
+	animation_name: String,
+	new_animation_name: String,
+	animation_progress: f64,
+	pub pos_frame_idx: i32,
+	pub rot_frame_idx: i32,
+	pub scale_frame_idx: i32,
+	pub once: bool,
+	num_loops: i32,
+	need_reset: bool,
+	done: bool,
+}
+
+impl AnimationState
+{
+	pub fn new(animation_name: &str, once: bool) -> Self
+	{
+		Self {
+			animation_name: animation_name.to_string(),
+			new_animation_name: animation_name.to_string(),
+			animation_progress: 0.,
+			once: once,
+			pos_frame_idx: 0,
+			rot_frame_idx: 0,
+			scale_frame_idx: 0,
+			num_loops: 0,
+			need_reset: false,
+			done: false,
+		}
+	}
+
+	pub fn reset(&mut self)
+	{
+		self.need_reset = true;
+	}
+
+	pub fn set_new_animation(&mut self, animation_name: impl Into<String>)
+	{
+		self.new_animation_name = animation_name.into();
+	}
+
+	pub fn get_num_loops(&self) -> i32
+	{
+		self.num_loops
+	}
+
+	pub fn is_done(&self) -> bool
+	{
+		self.done
+	}
+}
+
 pub enum ObjectKind<MaterialKindT: MaterialKind>
 {
 	MultiMesh
+	{
+		meshes: Vec<Mesh<MaterialKindT>>,
+	},
+	CollisionMesh
 	{
 		meshes: Vec<Mesh<MaterialKindT>>,
 	},
@@ -69,8 +214,278 @@ pub enum ObjectKind<MaterialKindT: MaterialKind>
 pub struct Object<MaterialKindT: MaterialKind>
 {
 	pub name: String,
-	pub position: Point3<f32>,
+	pub pos: Point3<f32>,
+	pub rot: UnitQuaternion<f32>,
+	pub scale: Vector3<f32>,
 	pub kind: ObjectKind<MaterialKindT>,
+	pub animations: HashMap<String, Animation>,
+	pub properties: serde_json::Value,
+}
+
+impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
+{
+	pub fn get_animation_position(
+		&self, state: &AnimationState,
+	) -> (Point3<f32>, UnitQuaternion<f32>, Vector3<f32>)
+	{
+		let animation = &self.animations.get(&state.animation_name).expect(&format!(
+			"Could not find animation '{}'",
+			state.animation_name
+		));
+
+		// TODO: support steps
+		let pos = if animation.pos_track.is_empty()
+		{
+			self.pos
+		}
+		else
+		{
+			let cur_frame = animation.pos_track[state.pos_frame_idx as usize];
+			if state.pos_frame_idx as usize + 1 >= animation.pos_track.len()
+			{
+				cur_frame.1
+			}
+			else
+			{
+				let next_frame = animation.pos_track[state.pos_frame_idx as usize + 1];
+				let f = ((state.animation_progress - cur_frame.0) / (next_frame.0 - cur_frame.0))
+					as f32;
+				cur_frame.1 + f * (next_frame.1 - cur_frame.1)
+			}
+		};
+		let rot = if animation.rot_track.is_empty()
+		{
+			self.rot
+		}
+		else
+		{
+			let cur_frame = animation.rot_track[state.rot_frame_idx as usize];
+			if state.rot_frame_idx as usize + 1 >= animation.rot_track.len()
+			{
+				cur_frame.1
+			}
+			else
+			{
+				let next_frame = animation.rot_track[state.rot_frame_idx as usize + 1];
+				let f = ((state.animation_progress - cur_frame.0) / (next_frame.0 - cur_frame.0))
+					as f32;
+				cur_frame.1.slerp(&next_frame.1, f)
+			}
+		};
+		let scale = if animation.scale_track.is_empty()
+		{
+			self.scale
+		}
+		else
+		{
+			let cur_frame = animation.scale_track[state.scale_frame_idx as usize];
+			if state.scale_frame_idx as usize + 1 >= animation.scale_track.len()
+			{
+				cur_frame.1
+			}
+			else
+			{
+				let next_frame = animation.scale_track[state.scale_frame_idx as usize + 1];
+				let f = ((state.animation_progress - cur_frame.0) / (next_frame.0 - cur_frame.0))
+					as f32;
+				cur_frame.1 + f * (next_frame.1 - cur_frame.1)
+			}
+		};
+
+		(pos, rot, scale)
+	}
+
+	pub fn draw<
+		'l,
+		BitmapFn: Fn(&Material<MaterialKindT>, &str) -> Option<&'l Bitmap>,
+		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
+	>(
+		&self, core: &Core, prim: &PrimitivesAddon, animation_state: Option<&AnimationState>,
+		bitmap_fn: BitmapFn, pos_fn: PosFn,
+	)
+	{
+		if let Some(state) = animation_state
+		{
+			let (pos, rot, scale) = self.get_animation_position(state);
+			pos_fn(pos, rot, scale);
+		}
+		else
+		{
+			pos_fn(self.pos, self.rot, self.scale);
+		}
+		if let ObjectKind::MultiMesh { meshes } = &self.kind
+		{
+			for mesh in meshes
+			{
+				core.set_shader_uniform(
+					"material",
+					&[mesh
+						.material
+						.as_ref()
+						.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
+						.unwrap_or(0)][..],
+				)
+				.ok();
+				let bitmap = mesh
+					.material
+					.as_ref()
+					.and_then(|m| bitmap_fn(&m, &m.desc.texture));
+				if let Some(bitmap) = bitmap
+				{
+					let material = mesh.material.as_ref().unwrap();
+					core.set_shader_uniform(
+						"tex_size",
+						&[[bitmap.get_width() as f32, bitmap.get_height() as f32]][..],
+					)
+					.ok();
+					core.set_shader_uniform("frame_ms", &[material.desc.frame_ms][..])
+						.ok();
+					core.set_shader_uniform("num_frames", &[material.desc.num_frames as i32][..])
+						.ok();
+					core.set_shader_uniform(
+						"frame_dxy",
+						&[[material.desc.frame_dx as f32, material.desc.frame_dy as f32]][..],
+					)
+					.ok();
+				}
+				prim.draw_indexed_buffer(
+					&mesh.vertex_buffer,
+					bitmap,
+					&mesh.index_buffer,
+					0,
+					mesh.idxs.len() as u32,
+					PrimType::TriangleList,
+				);
+			}
+		}
+	}
+
+	pub fn advance_state(&self, state: &mut AnimationState, amount: f64)
+	{
+		state.num_loops = 0;
+
+		let reset_activations =
+			(state.animation_name != state.new_animation_name) || state.need_reset;
+		let animation = &self.animations.get(&state.animation_name).expect(&format!(
+			"Could not find animation '{}'",
+			state.animation_name
+		));
+		if reset_activations
+		{
+			state.animation_name = state.new_animation_name.clone();
+			state.pos_frame_idx = 0;
+			state.rot_frame_idx = 0;
+			state.scale_frame_idx = 0;
+			state.animation_progress = 0.;
+			state.need_reset = false;
+			state.done = false;
+		}
+		state.animation_progress += amount;
+
+		loop
+		{
+			let old_pos_frame_idx = state.pos_frame_idx;
+			let old_rot_frame_idx = state.rot_frame_idx;
+			let old_scale_frame_idx = state.scale_frame_idx;
+
+			if !animation.pos_track.is_empty()
+			{
+				if state.animation_progress > animation.pos_track[state.pos_frame_idx as usize].0
+				{
+					state.pos_frame_idx =
+						(state.pos_frame_idx + 1).min(animation.pos_track.len() as i32 - 1);
+				}
+			}
+			if !animation.rot_track.is_empty()
+			{
+				if state.animation_progress > animation.rot_track[state.rot_frame_idx as usize].0
+				{
+					state.rot_frame_idx =
+						(state.rot_frame_idx + 1).min(animation.rot_track.len() as i32 - 1);
+				}
+			}
+			if !animation.scale_track.is_empty()
+			{
+				if state.animation_progress > animation.pos_track[state.pos_frame_idx as usize].0
+				{
+					state.pos_frame_idx =
+						(state.pos_frame_idx + 1).min(animation.pos_track.len() as i32 - 1);
+				}
+			}
+			if state.animation_progress > animation.end
+			{
+				if !state.done
+				{
+					state.num_loops += 1;
+				}
+				if state.once
+				{
+					state.done = true;
+				}
+				else
+				{
+					state.pos_frame_idx = 0;
+					state.rot_frame_idx = 0;
+					state.scale_frame_idx = 0;
+					state.animation_progress -= animation.end;
+				}
+			}
+			if old_pos_frame_idx == state.pos_frame_idx
+				&& old_rot_frame_idx == state.rot_frame_idx
+				&& old_scale_frame_idx == state.scale_frame_idx
+			{
+				break;
+			}
+		}
+	}
+
+	pub fn create_clone(
+		&self, display: &mut Display, prim: &PrimitivesAddon, read_write: bool,
+	) -> Result<Self>
+	{
+		let kind = match &self.kind
+		{
+			ObjectKind::Empty => ObjectKind::Empty,
+			ObjectKind::Light { intensity, color } => ObjectKind::Light {
+				intensity: *intensity,
+				color: *color,
+			},
+			ObjectKind::NavMesh { nodes } => ObjectKind::NavMesh {
+				nodes: nodes.clone(),
+			},
+			ObjectKind::CollisionMesh { .. } =>
+			{
+				unimplemented!();
+			}
+			ObjectKind::MultiMesh { meshes } =>
+			{
+				let mut new_meshes = vec![];
+				for mesh in meshes
+				{
+					let (vertex_buffer, index_buffer) =
+						create_buffers(display, prim, &mesh.vtxs, &mesh.idxs, read_write)?;
+
+					new_meshes.push(Mesh {
+						vtxs: mesh.vtxs.clone(),
+						idxs: mesh.idxs.clone(),
+						material: mesh.material.clone(),
+						vertex_buffer: vertex_buffer,
+						index_buffer: index_buffer,
+					});
+				}
+				ObjectKind::MultiMesh { meshes: new_meshes }
+			}
+		};
+		Ok(Self {
+			name: self.name.clone(),
+			pos: self.pos.clone(),
+			rot: self.rot.clone(),
+			scale: self.scale.clone(),
+			kind: kind,
+			animations: self.animations.clone(),
+			properties: self.properties.clone(),
+		})
+	}
 }
 
 pub struct Scene<MaterialKindT: MaterialKind>
@@ -178,7 +593,8 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 						})
 					})?;
 
-				let (vertex_buffer, index_buffer) = create_buffers(display, prim, &vtxs, &idxs)?;
+				let (vertex_buffer, index_buffer) =
+					create_buffers(display, prim, &vtxs, &idxs, false)?;
 
 				meshes.push(Mesh {
 					vtxs: vtxs,
@@ -189,10 +605,23 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 				});
 			}
 
+			let kind = if obj.name.starts_with("Collision")
+			{
+				ObjectKind::CollisionMesh { meshes: meshes }
+			}
+			else
+			{
+				ObjectKind::MultiMesh { meshes: meshes }
+			};
+
 			let object = Object {
 				name: obj.name.clone(),
-				position: Point3::origin(),
-				kind: ObjectKind::MultiMesh { meshes: meshes },
+				pos: Point3::origin(),
+				rot: UnitQuaternion::identity(),
+				scale: Vector3::new(1.0, 1.0, 1.0),
+				kind: kind,
+				animations: HashMap::new(),
+				properties: serde_json::Value::Null,
 			};
 			objects.push(object);
 		}
@@ -204,20 +633,169 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 	{
 		let (document, buffers, _) = gltf::import(gltf_file)?;
 		let mut objects = vec![];
+
+		let mut obj_to_name_to_animation: HashMap<String, HashMap<String, Animation>> =
+			HashMap::new();
+		for animation in document.animations()
+		{
+			let name = animation.name().unwrap_or("").to_string();
+			for channel in animation.channels()
+			{
+				let target = channel
+					.target()
+					.node()
+					.name()
+					.ok_or_else(|| {
+						format!(
+							"Animation '{}' in '{}' is missing a target?",
+							name, gltf_file
+						)
+					})?
+					.to_string();
+				let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
+
+				let times = if let Some(ReadInputs::Standard(inputs)) = reader.read_inputs()
+				{
+					inputs.map(|t| t as f64).collect::<Vec<_>>()
+				}
+				else
+				{
+					return Err(format!(
+						"Animation '{}' in '{}' has sparse values, unsupported.",
+						name, gltf_file
+					))?;
+				};
+
+				// TODO: This is trully horrid, surely we can do better.
+				match reader.read_outputs()
+				{
+					Some(ReadOutputs::Translations(translations)) =>
+					{
+						let track: Vec<_> = times
+							.iter()
+							.zip(translations)
+							.map(|(&t, v)| (t, Point3::from(v)))
+							.collect();
+
+						obj_to_name_to_animation
+							.entry(target)
+							.and_modify(|name_to_animation| {
+								name_to_animation
+									.entry(name.clone())
+									.and_modify(|animation| {
+										animation.pos_track = track.clone();
+									})
+									.or_insert(Animation::new(track.clone(), vec![], vec![]));
+							})
+							.or_insert_with(|| {
+								let mut name_to_animation = HashMap::new();
+								name_to_animation.insert(
+									name.clone(),
+									Animation::new(track.clone(), vec![], vec![]),
+								);
+								name_to_animation
+							});
+					}
+					Some(ReadOutputs::Rotations(gltf::animation::util::Rotations::F32(
+						rotations,
+					))) =>
+					{
+						let track: Vec<_> = times
+							.iter()
+							.zip(rotations)
+							.map(|(&t, v)| (t, UnitQuaternion::from_quaternion(v.into())))
+							.collect();
+						obj_to_name_to_animation
+							.entry(target)
+							.and_modify(|name_to_animation| {
+								name_to_animation
+									.entry(name.clone())
+									.and_modify(|animation| {
+										animation.rot_track = track.clone();
+									})
+									.or_insert(Animation::new(vec![], track.clone(), vec![]));
+							})
+							.or_insert_with(|| {
+								let mut name_to_animation = HashMap::new();
+								name_to_animation.insert(
+									name.clone(),
+									Animation::new(vec![], track.clone(), vec![]),
+								);
+								name_to_animation
+							});
+					}
+					Some(ReadOutputs::Scales(scales)) =>
+					{
+						let track: Vec<_> = times
+							.iter()
+							.zip(scales)
+							.map(|(&t, v)| (t, v.into()))
+							.collect();
+						obj_to_name_to_animation
+							.entry(target)
+							.and_modify(|name_to_animation| {
+								name_to_animation
+									.entry(name.clone())
+									.and_modify(|animation| {
+										animation.scale_track = track.clone();
+									})
+									.or_insert(Animation::new(vec![], vec![], track.clone()));
+							})
+							.or_insert_with(|| {
+								let mut name_to_animation = HashMap::new();
+								name_to_animation.insert(
+									name.clone(),
+									Animation::new(vec![], vec![], track.clone()),
+								);
+								name_to_animation
+							});
+					}
+					_ => (),
+				}
+			}
+		}
+
+		for name_to_animation in &mut obj_to_name_to_animation.values_mut()
+		{
+			for animation in name_to_animation.values_mut()
+			{
+				animation.compute_start_end();
+			}
+		}
+
 		for node in document.nodes()
 		{
-			let (translation, _rot, _scale) = node.transform().decomposed();
-			let position = Point3::new(translation[0], translation[1], translation[2]);
+			let (translation, rot, scale) = node.transform().decomposed();
+			let pos = translation.into();
+			let rot = UnitQuaternion::from_quaternion(rot.into());
+			let scale = scale.into();
 			let object;
+			let name = node.name().unwrap_or("").to_string();
+			let animations = obj_to_name_to_animation
+				.get(&name)
+				.unwrap_or(&HashMap::new())
+				.clone();
+			let properties = if let Some(extras) = node.extras()
+			{
+				serde_json::from_str(extras.get())?
+			}
+			else
+			{
+				serde_json::Value::Null
+			};
 
-			if node.name().map_or(false, |n| n == "Navmesh")
+			if name == "Navmesh"
 			{
 				object = Object {
 					name: node.name().unwrap_or("").to_string(),
-					position: position,
+					pos: pos,
+					rot: rot,
+					scale: scale,
 					kind: ObjectKind::NavMesh {
 						nodes: get_navmesh(&node, &buffers)?,
 					},
+					animations: animations,
+					properties: properties,
 				}
 			}
 			else if let Some(light) = node.light()
@@ -225,11 +803,15 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 				let color = light.color();
 				object = Object {
 					name: node.name().unwrap_or("").to_string(),
-					position: position,
+					pos: pos,
+					rot: rot,
+					scale: scale,
 					kind: ObjectKind::Light {
 						intensity: light.intensity(),
 						color: Color::from_rgb_f(color[0], color[1], color[2]),
 					},
+					animations: animations,
+					properties: properties,
 				};
 			}
 			else if let Some(mesh) = node.mesh()
@@ -319,7 +901,7 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 						})?;
 
 					let (vertex_buffer, index_buffer) =
-						create_buffers(display, prim, &vtxs, &idxs)?;
+						create_buffers(display, prim, &vtxs, &idxs, false)?;
 
 					meshes.push(Mesh {
 						vtxs: vtxs,
@@ -329,18 +911,37 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 						material: material,
 					});
 				}
+
+				let name = node.name().unwrap_or("").to_string();
+				let kind = if name.starts_with("Collision")
+				{
+					ObjectKind::CollisionMesh { meshes: meshes }
+				}
+				else
+				{
+					ObjectKind::MultiMesh { meshes: meshes }
+				};
+
 				object = Object {
-					name: node.name().unwrap_or("").to_string(),
-					position: position,
-					kind: ObjectKind::MultiMesh { meshes: meshes },
+					name: name,
+					pos: pos,
+					rot: rot,
+					scale: scale,
+					kind: kind,
+					animations: animations,
+					properties: properties,
 				};
 			}
 			else
 			{
 				object = Object {
-					name: node.name().unwrap_or("").to_string(),
-					position: position,
+					name: name,
+					pos: pos,
+					rot: rot,
+					scale: scale,
 					kind: ObjectKind::Empty,
+					animations: animations,
+					properties: properties,
 				};
 			}
 			objects.push(object);
@@ -348,37 +949,25 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 		Ok(Self { objects: objects })
 	}
 
-	pub fn draw<'l, T: Fn(&Material<MaterialKindT>, &str) -> Result<&'l Bitmap>>(
-		&self, core: &Core, prim: &PrimitivesAddon, bitmap_fn: T,
+	pub fn draw<
+		'l,
+		AnimationFn: Fn(usize, &Object<MaterialKindT>) -> Option<&'l AnimationState>,
+		BitmapFn: Fn(&Material<MaterialKindT>, &str) -> Option<&'l Bitmap>,
+		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
+	>(
+		&self, core: &Core, prim: &PrimitivesAddon, animation_state_fn: AnimationFn,
+		bitmap_fn: BitmapFn, pos_fn: PosFn,
 	)
 	{
-		for object in self.objects.iter()
+		for (idx, object) in self.objects.iter().enumerate()
 		{
-			if let ObjectKind::MultiMesh { meshes } = &object.kind
-			{
-				for mesh in meshes
-				{
-					core.set_shader_uniform(
-						"material",
-						&[mesh
-							.material
-							.as_ref()
-							.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
-							.unwrap_or(0)][..],
-					)
-					.ok();
-					prim.draw_indexed_buffer(
-						&mesh.vertex_buffer,
-						mesh.material
-							.as_ref()
-							.and_then(|m| Some(bitmap_fn(&m, &m.desc.texture).unwrap())),
-						&mesh.index_buffer,
-						0,
-						mesh.idxs.len() as u32,
-						PrimType::TriangleList,
-					);
-				}
-			}
+			object.draw(
+				core,
+				prim,
+				animation_state_fn(idx, object),
+				&bitmap_fn,
+				&pos_fn,
+			);
 		}
 	}
 
@@ -401,6 +990,10 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 				ObjectKind::NavMesh { nodes } => ObjectKind::NavMesh {
 					nodes: nodes.clone(),
 				},
+				ObjectKind::CollisionMesh { .. } =>
+				{
+					unimplemented!();
+				}
 				ObjectKind::MultiMesh { meshes } =>
 				{
 					let mut new_meshes = vec![];
@@ -424,7 +1017,7 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 						}
 
 						let (vertex_buffer, index_buffer) =
-							create_buffers(display, prim, &mesh.vtxs, &new_indices)?;
+							create_buffers(display, prim, &mesh.vtxs, &new_indices, false)?;
 
 						new_meshes.push(Mesh {
 							vtxs: mesh.vtxs.clone(),
@@ -439,8 +1032,12 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 			};
 			objects.push(Object {
 				name: object.name.clone(),
-				position: object.position,
+				pos: object.pos.clone(),
+				rot: object.rot.clone(),
+				scale: object.scale.clone(),
 				kind: kind,
+				animations: object.animations.clone(),
+				properties: object.properties.clone(),
 			})
 		}
 
@@ -448,7 +1045,7 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct MeshVertex
 {
@@ -601,11 +1198,19 @@ impl astar::Node for NavNode
 
 fn create_buffers(
 	display: &mut Display, prim: &PrimitivesAddon, vtxs: &[MeshVertex], idxs: &[i32],
+	read_write: bool,
 ) -> Result<(VertexBuffer<MeshVertex>, IndexBuffer<u32>)>
 {
-	let vertex_buffer =
-		VertexBuffer::new(display, prim, Some(&vtxs), vtxs.len() as u32, BUFFER_STATIC)
-			.map_err(|_| "Could not create vertex buffer".to_string())?;
+	let flags = if read_write
+	{
+		BUFFER_READWRITE
+	}
+	else
+	{
+		BUFFER_STATIC
+	};
+	let vertex_buffer = VertexBuffer::new(display, prim, Some(&vtxs), vtxs.len() as u32, flags)
+		.map_err(|_| "Could not create vertex buffer".to_string())?;
 	let index_buffer = IndexBuffer::new(
 		display,
 		prim,

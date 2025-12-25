@@ -50,10 +50,25 @@ pub fn random_color(seed: u64, saturation: f32, value: f32) -> Color
 pub trait ColorExt
 {
 	fn interpolate(&self, other: Color, f: f32) -> Color;
+	fn interpolate_gamma(&self, other: Color, f: f32) -> Color;
 }
 
 impl ColorExt for Color
 {
+	fn interpolate_gamma(&self, other: Color, f: f32) -> Color
+	{
+		let gamma = 2.2; // sRGB
+		let fi = 1. - f;
+		let (r, g, b, a) = self.to_rgba_f();
+		let (or, og, ob, oa) = other.to_rgba_f();
+		Color::from_rgba_f(
+			(r.powf(1. / gamma) * fi + or.powf(1. / gamma) * f).powf(gamma),
+			(g.powf(1. / gamma) * fi + og.powf(1. / gamma) * f).powf(gamma),
+			(b.powf(1. / gamma) * fi + ob.powf(1. / gamma) * f).powf(gamma),
+			(a.powf(1. / gamma) * fi + oa.powf(1. / gamma) * f).powf(gamma),
+		)
+	}
+
 	fn interpolate(&self, other: Color, f: f32) -> Color
 	{
 		let fi = 1. - f;
@@ -223,14 +238,8 @@ pub fn load_ttf_font(ttf: &TtfAddon, file: &str, size: i32) -> Result<Font>
 		.map_err(|_| format!("Couldn't load {}", file))?)
 }
 
-fn process_shader_source(source: String) -> String
+fn process_shader_source(source: String, replacements: &[(&str, &str)]) -> String
 {
-	let replacements = [
-		("STATIC_MATERIAL", "0"),
-		("DYNAMIC_MATERIAL", "1"),
-		("FULLBRIGHT_MATERIAL", "2"),
-	];
-
 	let mut ret = source;
 	for (from, to) in replacements
 	{
@@ -239,7 +248,8 @@ fn process_shader_source(source: String) -> String
 	ret
 }
 
-pub fn load_shader(disp: &mut Display, path: &str) -> Result<Shader>
+pub fn load_shader(disp: &mut Display, path: &str, replacements: &[(&str, &str)])
+-> Result<Shader>
 {
 	let shader = Shader::new(disp, ShaderPlatform::GLSL).unwrap();
 	let vertex_path = format!("{path}_vertex.glsl");
@@ -248,8 +258,8 @@ pub fn load_shader(disp: &mut Display, path: &str) -> Result<Shader>
 	let mut vertex_source = read_to_string(&vertex_path)?;
 	let mut pixel_source = read_to_string(&pixel_path)?;
 
-	vertex_source = process_shader_source(vertex_source);
-	pixel_source = process_shader_source(pixel_source);
+	vertex_source = process_shader_source(vertex_source, replacements);
+	pixel_source = process_shader_source(pixel_source, replacements);
 
 	shader
 		.attach_shader_source(ShaderType::Vertex, Some(&vertex_source))
