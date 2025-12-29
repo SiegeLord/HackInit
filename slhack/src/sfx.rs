@@ -173,6 +173,18 @@ impl Sfx
 		Ok(())
 	}
 
+	pub fn play_sound_fixed(&mut self, name: &str) -> Result<()>
+	{
+		self.cache_sample(name)?;
+		let sample = self.samples.get(name).unwrap();
+		let instance = self
+			.sink
+			.play_sample(sample, self.sfx_volume, None, 1., Playmode::Once)
+			.map_err(|_| "Couldn't play sound".to_string())?;
+		self.add_sample_instance(name, instance);
+		Ok(())
+	}
+
 	pub fn play_sound(&mut self, name: &str) -> Result<()>
 	{
 		self.cache_sample(name)?;

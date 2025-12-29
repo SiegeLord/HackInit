@@ -592,7 +592,7 @@ impl<ActionT: Action> Controls<ActionT>
 	{
 		Self {
 			action_to_inputs: action_to_inputs,
-			mouse_sensitivity: 0.1,
+			mouse_sensitivity: 1.,
 			thumb_dead_zone: 0.25,
 		}
 	}
@@ -617,16 +617,18 @@ pub struct ControlsHandler<ActionT: Action>
 	controls: Controls<ActionT>,
 	input_to_action: BTreeMap<Input, ActionT>,
 	input_state: HashMap<Input, InputState>,
+	mouse_factor: f32,
 }
 
 impl<ActionT: Action> ControlsHandler<ActionT>
 {
-	pub fn new(controls: Controls<ActionT>) -> Self
+	pub fn new(controls: Controls<ActionT>, mouse_factor: f32) -> Self
 	{
 		let mut ret = Self {
 			controls: controls,
 			input_to_action: BTreeMap::new(),
 			input_state: HashMap::new(),
+			mouse_factor: mouse_factor,
 		};
 		ret.update_derived();
 		ret
@@ -726,7 +728,9 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseXNeg)
 					{
-						state.push(self.controls.mouse_sensitivity * -*dx as f32);
+						state.push(
+							self.mouse_factor * self.controls.mouse_sensitivity * -*dx as f32,
+						);
 						state.push(0.);
 					}
 				}
@@ -734,7 +738,8 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseXPos)
 					{
-						state.push(self.controls.mouse_sensitivity * *dx as f32);
+						state
+							.push(self.mouse_factor * self.controls.mouse_sensitivity * *dx as f32);
 						state.push(0.);
 					}
 				}
@@ -742,7 +747,9 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseYNeg)
 					{
-						state.push(self.controls.mouse_sensitivity * -*dy as f32);
+						state.push(
+							self.mouse_factor * self.controls.mouse_sensitivity * -*dy as f32,
+						);
 						state.push(0.);
 					}
 				}
@@ -750,7 +757,8 @@ impl<ActionT: Action> ControlsHandler<ActionT>
 				{
 					if let Some(state) = self.input_state.get_mut(&Input::MouseYPos)
 					{
-						state.push(self.controls.mouse_sensitivity * *dy as f32);
+						state
+							.push(self.mouse_factor * self.controls.mouse_sensitivity * *dy as f32);
 						state.push(0.);
 					}
 				}

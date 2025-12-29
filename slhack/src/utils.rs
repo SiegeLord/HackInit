@@ -193,6 +193,42 @@ pub fn user_data_path(core: &Core) -> Result<path::PathBuf>
 	Ok(path_buf)
 }
 
+pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
+	core: &Core, filename: &str, version: &str,
+) -> Result<Option<T>>
+{
+	let mut path_buf = user_data_path(core)?;
+	path_buf.push(filename);
+	if path_buf.exists()
+	{
+		let file = path_buf.to_str().unwrap();
+		let contents = read_to_string(file)?;
+		let mut source = Source::new(path::Path::new(file), &contents);
+		let element = ConfigElement::from_source(&mut source)
+			.map_err(|e| Error::new(format!("Config parsing error"), Some(Box::new(e))))?;
+
+		if let Some(table) = element.as_table()
+		{
+			if !table
+				.get("version")
+				.and_then(|v| v.as_value())
+				.map(|v| *v == version)
+				.unwrap_or(false)
+			{
+				return Ok(None);
+			}
+		}
+
+		Ok(Some(from_element::<T>(&element, Some(&source)).map_err(
+			|e| Error::new(format!("Config parsing error"), Some(Box::new(e))),
+		)?))
+	}
+	else
+	{
+		Ok(None)
+	}
+}
+
 pub fn load_user_data<T: DeserializeOwned + Clone>(core: &Core, filename: &str)
 -> Result<Option<T>>
 {

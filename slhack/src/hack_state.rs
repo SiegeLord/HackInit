@@ -97,8 +97,8 @@ impl HackState
 			display_height: 0.,
 			buffer1: None,
 			buffer2: None,
-			game_ui_controls: controls::ControlsHandler::new(ui::new_game_ui_controls()),
-			menu_controls: controls::ControlsHandler::new(ui::new_menu_controls()),
+			game_ui_controls: controls::ControlsHandler::new(ui::new_game_ui_controls(), 1.),
+			menu_controls: controls::ControlsHandler::new(ui::new_menu_controls(), 1.),
 			track_mouse: true,
 			hide_mouse: false,
 			mouse_pos: Point2::new(0, 0),
@@ -146,7 +146,9 @@ impl HackState
 		self.ui_font.as_ref().unwrap()
 	}
 
-	pub fn resize_display(&mut self, gfx_options: &GfxOptions) -> Result<()>
+	pub fn resize_display(
+		&mut self, ui_font: &str, ui_font_size: f32, gfx_options: &GfxOptions,
+	) -> Result<()>
 	{
 		let buffer_width;
 		let buffer_height;
@@ -184,8 +186,8 @@ impl HackState
 
 		self.ui_font = Some(utils::load_ttf_font(
 			&self.ttf,
-			"data/Energon.ttf",
-			(-24. * gfx_options.ui_scale) as i32,
+			&ui_font,
+			(ui_font_size * gfx_options.ui_scale) as i32,
 		)?);
 		Ok(())
 	}
