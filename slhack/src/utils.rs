@@ -212,7 +212,11 @@ pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
 			if !table
 				.get("version")
 				.and_then(|v| v.as_value())
-				.map(|v| *v == version)
+				.map(|config_version| {
+					let version = semver::Version::parse(version).unwrap();
+					let config_version = semver::Version::parse(config_version).unwrap();
+					version.major == config_version.major && version.minor == config_version.minor
+				})
 				.unwrap_or(false)
 			{
 				return Ok(None);
