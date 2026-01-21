@@ -30,6 +30,8 @@ struct SpriteDesc
 	center_offt_y: f32,
 	#[serde(default)]
 	animations: HashMap<String, AnimationDesc>,
+	#[serde(default)]
+	palettes: Vec<String>,
 }
 
 struct Animation
@@ -49,7 +51,14 @@ impl Sprite
 	{
 		let mut desc: SpriteDesc = utils::load_config(filename)?;
 
-		let bitmap = utils::load_bitmap(&core, &desc.bitmap)?;
+		let bitmap = if !desc.palettes.is_empty()
+		{
+			utils::load_bitmap_indexed(&core, &desc.bitmap)?
+		}
+		else
+		{
+			utils::load_bitmap(&core, &desc.bitmap)?
+		};
 		if desc.width == 0
 		{
 			desc.width = bitmap.get_width();
@@ -162,6 +171,11 @@ impl Sprite
 		);
 	}
 
+	pub fn get_palettes(&self) -> &[String]
+	{
+		&self.desc.palettes
+	}
+
 	pub fn get_frame_from_state(
 		&self, animation_state: &AnimationState,
 	) -> (atlas::AtlasBitmap, Vector2<f32>)
@@ -200,6 +214,7 @@ impl Sprite
 		{
 			state.animation_name = state.new_animation_name.clone();
 			state.frame_idx = 0;
+			state.num_activations.clear();
 			// TODO: Why aren't we resetting frame_progress?
 		}
 		let animation_desc = &self
@@ -210,14 +225,13 @@ impl Sprite
 				"Could not find animation '{}'",
 				state.animation_name
 			));
+		// Hack to populate the activations on start.
 		if reset_activations
+			|| (!animation_desc.active_frames.is_empty() && state.num_activations.is_empty())
 		{
 			for (active_frame, _) in animation_desc.active_frames.iter()
 			{
-				state
-					.num_activations
-					.entry(active_frame.clone())
-					.or_insert(0);
+				state.num_activations.insert(active_frame.clone(), 0);
 			}
 		}
 

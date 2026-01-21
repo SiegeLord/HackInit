@@ -23,6 +23,24 @@ pub enum MaterialKind
 	Static = 0,
 	Dynamic = 1,
 	Fullbright = 2,
+	NumMaterials = 3,
+}
+
+pub fn shader_replacements() -> Vec<(&'static str, &'static str)>
+{
+	let mut ret = vec![];
+	for i in 0..MaterialKind::NumMaterials as i32
+	{
+		let variant = unsafe { std::mem::transmute(i) };
+		ret.push(match variant
+		{
+			MaterialKind::Static => ("STATIC_MATERIAL", "0"),
+			MaterialKind::Dynamic => ("DYNAMIC_MATERIAL", "1"),
+			MaterialKind::Fullbright => ("FULLBRIGHT_MATERIAL", "2"),
+			MaterialKind::NumMaterials => unreachable!(),
+		});
+	}
+	ret
 }
 
 impl Into<i32> for MaterialKind
@@ -156,7 +174,7 @@ impl GameState
 		//sfx.set_music_file("data/lemonade-sinus.xm");
 		//sfx.play_music()?;
 
-		let controls = controls::ControlsHandler::new(options.controls.clone());
+		let controls = controls::ControlsHandler::new(options.controls.clone(), 1.);
 		Ok(Self {
 			options: options,
 			bitmaps: HashMap::new(),
@@ -176,7 +194,9 @@ impl GameState
 
 	pub fn resize_display(&mut self) -> Result<()>
 	{
-		self.hs.resize_display().map_err(Into::into)
+		Ok(self
+			.hs
+			.resize_display("data/Energon.ttf", -16.0, &self.options.gfx)?)
 	}
 
 	pub fn cache_bitmap<'l>(&'l mut self, name: &str) -> Result<&'l Bitmap>

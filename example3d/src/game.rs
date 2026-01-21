@@ -4,8 +4,8 @@ use crate::{components as comps, game_state, ui, utils};
 use allegro::*;
 use allegro_font::*;
 use na::{
-	Isometry3, Matrix4, Perspective3, Point2, Point3, Quaternion, RealField, Rotation2, Rotation3,
-	Similarity3, Unit, Vector2, Vector3, Vector4,
+	Isometry3, Matrix4, Perspective3, Point2, Point3, RealField, Rotation2, Rotation3, Similarity3,
+	UnitQuaternion, Vector2, Vector3, Vector4,
 };
 use nalgebra as na;
 use rand::prelude::*;
@@ -172,7 +172,7 @@ impl Map
 			if let scene::ObjectKind::Light { color, intensity } = object.kind
 			{
 				spawn_light(
-					object.position,
+					object.pos,
 					comps::Light {
 						color: color,
 						intensity: intensity / 50.,
@@ -308,10 +308,9 @@ impl Map
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
 
-		let material_mapper =
-			|_material: &scene::Material<game_state::MaterialKind>,
-			 texture_name: &str|
-			 -> slhack::error::Result<&Bitmap> { state.get_bitmap(texture_name).into_slhack() };
+		let material_mapper = |_material: &scene::Material<game_state::MaterialKind>,
+		                       texture_name: &str|
+		 -> Option<&Bitmap> { state.get_bitmap(texture_name).ok() };
 
 		state
 			.hs
@@ -321,7 +320,13 @@ impl Map
 		state
 			.get_scene("data/test_level_sprytile.glb")
 			.unwrap()
-			.draw(&state.hs.core, &state.hs.prim, material_mapper);
+			.draw(
+				&state.hs.core,
+				&state.hs.prim,
+				|_, _| None,
+				material_mapper,
+				|_, _, _| {},
+			);
 
 		for (_, (position, scene)) in self
 			.world
@@ -331,20 +336,34 @@ impl Map
 			let shift = Isometry3::new(position.draw_pos(state.hs.alpha).coords, Vector3::zeros())
 				.to_homogeneous();
 
-			state
-				.hs
-				.core
-				.use_transform(&utils::mat4_to_transform(camera.to_homogeneous() * shift));
-			state
-				.hs
-				.core
-				.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
-				.ok();
+			let pos_fn =
+				|obj_pos: Point3<f32>, obj_rot: UnitQuaternion<f32>, obj_scale: Vector3<f32>| {
+					let obj_shift = Isometry3 {
+						translation: obj_pos.coords.into(),
+						rotation: obj_rot.into(),
+					}
+					.to_homogeneous();
+					let obj_scale = Matrix4::new_nonuniform_scaling(&obj_scale);
+
+					state.hs.core.use_transform(&utils::mat4_to_transform(
+						camera.to_homogeneous() * shift * obj_shift * obj_scale,
+					));
+					state
+						.hs
+						.core
+						.set_shader_transform(
+							"model_matrix",
+							&utils::mat4_to_transform(shift * obj_shift * obj_scale),
+						)
+						.ok();
+				};
 
 			state.get_scene(&scene.scene).unwrap().draw(
 				&state.hs.core,
 				&state.hs.prim,
+				|_, _| None,
 				material_mapper,
+				pos_fn,
 			);
 		}
 
@@ -394,9 +413,13 @@ impl Map
 
 			if let Ok(scene) = state.get_scene("data/sphere.glb")
 			{
-				scene.draw(&state.hs.core, &state.hs.prim, |_, s| {
-					state.get_bitmap(s).into_slhack()
-				});
+				scene.draw(
+					&state.hs.core,
+					&state.hs.prim,
+					|_, _| None,
+					|_, s| state.get_bitmap(s).ok(),
+					|_, _, _| {},
+				);
 			}
 		}
 

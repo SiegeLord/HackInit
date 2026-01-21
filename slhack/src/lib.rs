@@ -9,6 +9,7 @@ pub mod game_loop;
 pub mod hack_state;
 pub mod scene;
 pub mod sfx;
+pub mod spatial_grid;
 pub mod sprite;
 pub mod ui;
 pub mod utils;
