@@ -1121,6 +1121,7 @@ unsafe impl VertexType for MeshVertex
 	}
 }
 
+/// Construct a navmesh from the vertices of a mesh.
 fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<NavNode>>
 {
 	let mesh = node.mesh();
@@ -1130,6 +1131,7 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		.next()
 		.ok_or("No prim in navmesh".to_string())?;
 
+	// Grab raw vertices from the mesh.
 	let mut vtxs = vec![];
 	let mut idxs = vec![];
 	let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -1141,7 +1143,9 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		}
 	}
 
+	// Deduplicate vertices based on distance.
 	let tol = 1e-3;
+	// Spatial hashable id function so we can merge vertices by distance.
 	let get_vtx_id = |pos: Point3<f32>| {
 		(
 			(pos.x / tol) as i32,
@@ -1150,6 +1154,7 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		)
 	};
 	let mut vtx_id_to_new_idx = HashMap::new();
+	// We use a second set of indicies to map the original vertices to the deduplicated ones.
 	let mut new_idxs = vec![];
 	let mut old_idxs = vec![];
 	let mut cur_idx = 0;
@@ -1165,6 +1170,7 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		new_idxs.push(new_idx);
 	}
 
+	// Grab the original vertices, triples are triangles.
 	if let Some(iter) = reader.read_indices()
 	{
 		for idx in iter.into_u32()
@@ -1173,6 +1179,8 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		}
 	}
 
+	// Create a map from vertex index to its neighbours (including itself).
+	// They key is the deduplicated indices.
 	let mut new_vtx_idx_to_neighbours = HashMap::new();
 	for triangle in idxs.chunks(3)
 	{
@@ -1189,6 +1197,7 @@ fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<
 		}
 	}
 
+	// Construct the navigation nodes.
 	let mut ret = vec![];
 	for (new_idx, &old_idx) in old_idxs.iter().enumerate()
 	{
