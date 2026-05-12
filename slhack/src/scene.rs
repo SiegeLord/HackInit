@@ -297,11 +297,11 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 
 	pub fn draw<
 		'l,
-		BitmapFn: Fn(&Material<MaterialKindT>, &str) -> Option<&'l Bitmap>,
+		MaterialFn: Fn(&Material<MaterialKindT>, &str) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
 		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
 	>(
 		&self, core: &Core, prim: &PrimitivesAddon, animation_state: Option<&AnimationState>,
-		bitmap_fn: BitmapFn, pos_fn: PosFn,
+		material_fn: MaterialFn, pos_fn: PosFn,
 	)
 	{
 		if let Some(state) = animation_state
@@ -320,19 +320,22 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 				if let (Some(vertex_buffer), Some(index_buffer)) =
 					(&mesh.vertex_buffer, &mesh.index_buffer)
 				{
+					let (material, bitmap) = mesh
+						.material
+						.as_ref()
+						.and_then(|m| material_fn(m, &m.desc.texture))
+						.map(|(m, b)| (Some(m), Some(b)))
+						.unwrap_or((None, None));
+
 					core.set_shader_uniform(
 						"material",
-						&[mesh
-							.material
+						&[material
 							.as_ref()
 							.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
 							.unwrap_or(0)][..],
 					)
 					.ok();
-					let bitmap = mesh
-						.material
-						.as_ref()
-						.and_then(|m| bitmap_fn(&m, &m.desc.texture));
+
 					if let Some(bitmap) = bitmap
 					{
 						let material = mesh.material.as_ref().unwrap();
@@ -978,11 +981,11 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 	pub fn draw<
 		'l,
 		AnimationFn: Fn(usize, &Object<MaterialKindT>) -> Option<&'l AnimationState>,
-		BitmapFn: Fn(&Material<MaterialKindT>, &str) -> Option<&'l Bitmap>,
+		MaterialFn: Fn(&Material<MaterialKindT>, &str) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
 		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
 	>(
 		&self, core: &Core, prim: &PrimitivesAddon, animation_state_fn: AnimationFn,
-		bitmap_fn: BitmapFn, pos_fn: PosFn,
+		material_fn: MaterialFn, pos_fn: PosFn,
 	)
 	{
 		for (idx, object) in self.objects.iter().enumerate()
@@ -991,7 +994,7 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 				core,
 				prim,
 				animation_state_fn(idx, object),
-				&bitmap_fn,
+				&material_fn,
 				&pos_fn,
 			);
 		}
