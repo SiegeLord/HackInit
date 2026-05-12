@@ -98,7 +98,7 @@ impl game_loop::LoopState for LoopState
 		{
 			Some(Screen::Menu(menu)) => menu.resize(&mut self.game_state),
 			Some(Screen::Game(game)) => game.resize(&mut self.game_state),
-			_ => (),
+			None => (),
 		}
 		Ok(())
 	}
@@ -109,7 +109,7 @@ impl game_loop::LoopState for LoopState
 		{
 			Some(Screen::Menu(menu)) => menu.draw(&mut self.game_state),
 			Some(Screen::Game(game)) => game.draw(&mut self.game_state),
-			_ => Ok(()),
+			None => Ok(()),
 		}
 		.into_slhack()
 	}
@@ -121,7 +121,7 @@ impl game_loop::LoopState for LoopState
 		{
 			Some(Screen::Menu(menu)) => menu.input(event, &mut self.game_state),
 			Some(Screen::Game(game)) => game.input(event, &mut self.game_state),
-			_ => Ok(None),
+			None => Ok(None),
 		}
 		.into_slhack()?;
 		Ok(())
@@ -133,8 +133,9 @@ impl game_loop::LoopState for LoopState
 		{
 			self.next_screen = match &mut self.cur_screen
 			{
+				Some(Screen::Menu(_)) => Ok(None),
 				Some(Screen::Game(game)) => game.logic(&mut self.game_state),
-				_ => Ok(None),
+				None => Ok(None),
 			}
 			.into_slhack()?;
 		}
