@@ -50,3 +50,6 @@ debug = true
 
 [features]
 use_user_settings = []
+
+[dev-dependencies]
+approx = "0.5.1"

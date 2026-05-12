@@ -64,13 +64,6 @@ pub struct Mesh<MaterialKindT: MaterialKind>
 }
 
 #[derive(Clone, Debug)]
-pub struct NavNode
-{
-	pub pos: Point3<f32>,
-	pub neighbours: Vec<i32>,
-}
-
-#[derive(Clone, Debug)]
 pub struct Position
 {
 	pub pos: Point3<f32>,
@@ -201,7 +194,7 @@ pub enum ObjectKind<MaterialKindT: MaterialKind>
 	},
 	NavMesh
 	{
-		nodes: Vec<NavNode>,
+		navmesh: NavMesh,
 	},
 	Light
 	{
@@ -460,8 +453,8 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 				intensity: *intensity,
 				color: *color,
 			},
-			ObjectKind::NavMesh { nodes } => ObjectKind::NavMesh {
-				nodes: nodes.clone(),
+			ObjectKind::NavMesh { navmesh } => ObjectKind::NavMesh {
+				navmesh: navmesh.clone(),
 			},
 			ObjectKind::CollisionMesh { .. } =>
 			{
@@ -807,13 +800,40 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 
 			if name == "Navmesh"
 			{
+				let mesh = node.mesh();
+				let mesh = mesh.as_ref().ok_or("No mesh in navmesh".to_string())?;
+				let prim = mesh
+					.primitives()
+					.next()
+					.ok_or("No prim in navmesh".to_string())?;
+
+				// Grab raw vertices from the mesh.
+				let mut vtxs = vec![];
+				let mut idxs = vec![];
+				let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
+				if let Some(pos_iter) = reader.read_positions()
+				{
+					for pos in pos_iter
+					{
+						vtxs.push(Point3::new(pos[0], pos[1], pos[2]));
+					}
+				}
+				// Grab the original vertices, triples are triangles.
+				if let Some(iter) = reader.read_indices()
+				{
+					for idx in iter.into_u32()
+					{
+						idxs.push(idx)
+					}
+				}
+
 				object = Object {
 					name: node.name().unwrap_or("").to_string(),
 					pos: pos,
 					rot: rot,
 					scale: scale,
 					kind: ObjectKind::NavMesh {
-						nodes: get_navmesh(&node, &buffers)?,
+						navmesh: NavMesh::new(&vtxs, &idxs),
 					},
 					animations: animations,
 					properties: properties,
@@ -1016,8 +1036,8 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 					intensity: *intensity,
 					color: *color,
 				},
-				ObjectKind::NavMesh { nodes } => ObjectKind::NavMesh {
-					nodes: nodes.clone(),
+				ObjectKind::NavMesh { navmesh } => ObjectKind::NavMesh {
+					navmesh: navmesh.clone(),
 				},
 				ObjectKind::CollisionMesh { .. } =>
 				{
@@ -1121,104 +1141,165 @@ unsafe impl VertexType for MeshVertex
 	}
 }
 
-/// Construct a navmesh from the vertices of a mesh.
-fn get_navmesh(node: &gltf::Node, buffers: &[gltf::buffer::Data]) -> Result<Vec<NavNode>>
+#[derive(Clone, Debug)]
+pub struct NavNode
 {
-	let mesh = node.mesh();
-	let mesh = mesh.as_ref().ok_or("No mesh in navmesh".to_string())?;
-	let prim = mesh
-		.primitives()
-		.next()
-		.ok_or("No prim in navmesh".to_string())?;
+	pub pos: Point3<f32>,
+	pub neighbours: Vec<i32>,
+}
 
-	// Grab raw vertices from the mesh.
-	let mut vtxs = vec![];
-	let mut idxs = vec![];
-	let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
-	if let Some(pos_iter) = reader.read_positions()
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct NavEdge
+{
+	/// Index into navnodes.
+	idx1: usize,
+	idx2: usize,
+	boundary: bool,
+}
+
+impl NavEdge
+{
+	fn new(idx1: usize, idx2: usize) -> Self
 	{
-		for pos in pos_iter
-		{
-			vtxs.push(Point3::new(pos[0], pos[1], pos[2]));
+		Self {
+			idx1: idx1,
+			idx2: idx2,
+			boundary: false,
 		}
 	}
+}
 
-	// Deduplicate vertices based on distance.
-	let tol = 1e-3;
-	// Spatial hashable id function so we can merge vertices by distance.
-	let get_vtx_id = |pos: Point3<f32>| {
-		(
-			(pos.x / tol) as i32,
-			(pos.y / tol) as i32,
-			(pos.z / tol) as i32,
-		)
-	};
-	let mut vtx_id_to_new_idx = HashMap::new();
-	// We use a second set of indicies to map the original vertices to the deduplicated ones.
-	let mut new_idxs = vec![];
-	let mut old_idxs = vec![];
-	let mut cur_idx = 0;
-	for (old_idx, vtx) in vtxs.iter().enumerate()
-	{
-		let vtx_id = get_vtx_id(*vtx);
-		let new_idx = *vtx_id_to_new_idx.entry(vtx_id).or_insert_with(|| {
-			let new_idx = cur_idx;
-			cur_idx += 1;
-			old_idxs.push(old_idx);
-			new_idx
-		});
-		new_idxs.push(new_idx);
-	}
+#[derive(Clone, Debug)]
+pub struct NavMesh
+{
+	pub nodes: Vec<NavNode>,
+	/// The starts of the edges are unique.
+	triangles: Vec<[NavEdge; 3]>,
+}
 
-	// Grab the original vertices, triples are triangles.
-	if let Some(iter) = reader.read_indices()
+impl NavMesh
+{
+	/// Construct a navmesh from the vertices of a mesh.
+	fn new(vtxs: &[Point3<f32>], idxs: &[u32]) -> Self
 	{
-		for idx in iter.into_u32()
+		// Deduplicate vertices based on distance.
+		let tol = 1e-3;
+		// Spatial hashable id function so we can merge vertices by distance.
+		let get_vtx_id = |pos: Point3<f32>| {
+			(
+				(pos.x / tol) as i32,
+				(pos.y / tol) as i32,
+				(pos.z / tol) as i32,
+			)
+		};
+		let mut vtx_id_to_new_idx = HashMap::new();
+		// We use a second set of indicies to map the original vertices to the deduplicated ones.
+		let mut new_idxs = vec![];
+		let mut old_idxs = vec![];
+		let mut cur_idx = 0;
+		for (old_idx, vtx) in vtxs.iter().enumerate()
 		{
-			idxs.push(idx as i32)
+			let vtx_id = get_vtx_id(*vtx);
+			let new_idx = *vtx_id_to_new_idx.entry(vtx_id).or_insert_with(|| {
+				let new_idx = cur_idx;
+				cur_idx += 1;
+				old_idxs.push(old_idx);
+				new_idx
+			});
+			new_idxs.push(new_idx);
 		}
-	}
 
-	// Create a map from vertex index to its neighbours (including itself).
-	// They key is the deduplicated indices.
-	let mut new_vtx_idx_to_neighbours = HashMap::new();
-	for triangle in idxs.chunks(3)
-	{
-		for &vtx_idx in triangle
+		// Create a map from vertex index to its neighbours (including itself).
+		// They key is the deduplicated indices.
+		// Also, construct the triangles + the edge counts.
+		let mut new_vtx_idx_to_neighbours = HashMap::new();
+		let mut triangles = vec![];
+		let mut edge_to_count = HashMap::new();
+		for triangle in idxs.chunks(3)
 		{
-			new_vtx_idx_to_neighbours
-				.entry(new_idxs[vtx_idx as usize])
-				.or_insert(vec![])
-				.extend([
+			for &vtx_idx in triangle
+			{
+				new_vtx_idx_to_neighbours
+					.entry(new_idxs[vtx_idx as usize])
+					.or_insert(vec![])
+					.extend([
+						new_idxs[triangle[0] as usize],
+						new_idxs[triangle[1] as usize],
+						new_idxs[triangle[2] as usize],
+					]);
+			}
+			let mut edges = [
+				NavEdge::new(
 					new_idxs[triangle[0] as usize],
 					new_idxs[triangle[1] as usize],
+				),
+				NavEdge::new(
+					new_idxs[triangle[1] as usize],
 					new_idxs[triangle[2] as usize],
-				]);
-		}
-	}
+				),
+				NavEdge::new(
+					new_idxs[triangle[2] as usize],
+					new_idxs[triangle[0] as usize],
+				),
+			];
 
-	// Construct the navigation nodes.
-	let mut ret = vec![];
-	for (new_idx, &old_idx) in old_idxs.iter().enumerate()
-	{
-		let new_idx = new_idx as i32;
-		let mut neighbours = vec![];
-		for &neighbour_vtx_idx in &new_vtx_idx_to_neighbours[&new_idx]
-		{
-			if neighbour_vtx_idx != new_idx
+			// Make sure the triangle is clockwise.
+			let v1 = vtxs[triangle[0] as usize];
+			let v2 = vtxs[triangle[1] as usize];
+			let v3 = vtxs[triangle[2] as usize];
+
+			let d1 = v2 - v1;
+			let d2 = v3 - v1;
+
+			// N.B. Y up.
+			if d1.cross(&d2).dot(&Vector3::y_axis()) > 0.
 			{
-				neighbours.push(neighbour_vtx_idx);
+				edges.swap(1, 2);
+			}
+
+			for edge in &edges
+			{
+				*edge_to_count.entry(edge.clone()).or_insert(0) += 1;
+			}
+			triangles.push(edges);
+		}
+
+		// Triangle edges that are part of only 1 triangle are boundary triangles.
+		for triangle in &mut triangles
+		{
+			for edge in triangle
+			{
+				edge.boundary = edge_to_count[edge] == 1;
 			}
 		}
-		neighbours.sort();
-		neighbours.dedup();
-		let node = NavNode {
-			pos: vtxs[old_idx],
-			neighbours: neighbours,
-		};
-		ret.push(node);
+
+		// Construct the navigation nodes.
+		let mut nodes = vec![];
+		for (new_idx, &old_idx) in old_idxs.iter().enumerate()
+		{
+			let new_idx = new_idx;
+			let mut neighbours = vec![];
+			for &neighbour_vtx_idx in &new_vtx_idx_to_neighbours[&new_idx]
+			{
+				if neighbour_vtx_idx != new_idx
+				{
+					neighbours.push(neighbour_vtx_idx as i32);
+				}
+			}
+			neighbours.sort();
+			neighbours.dedup();
+			let node = NavNode {
+				pos: vtxs[old_idx],
+				neighbours: neighbours,
+			};
+			nodes.push(node);
+		}
+
+		Self {
+			nodes: nodes,
+			triangles: triangles,
+		}
 	}
-	Ok(ret)
 }
 
 impl astar::Node for NavNode
@@ -1258,4 +1339,59 @@ fn create_buffers(
 	)
 	.map_err(|_| "Could not create index buffer".to_string())?;
 	Ok((vertex_buffer, index_buffer))
+}
+
+#[test]
+fn test_navmesh()
+{
+	let vtxs = [
+		Point3::new(0., 0., 0.),
+		Point3::new(1., 0., 0.),
+		Point3::new(0., 0., 1.),
+		Point3::new(1., 0., 1.),
+	];
+	let idxs = [0, 1, 3, 0, 2, 3];
+
+	let navmesh = NavMesh::new(&vtxs, &idxs);
+
+	assert_eq!(
+		navmesh.triangles[0],
+		[
+			NavEdge {
+				idx1: 0,
+				idx2: 1,
+				boundary: true
+			},
+			NavEdge {
+				idx1: 1,
+				idx2: 3,
+				boundary: true
+			},
+			NavEdge {
+				idx1: 3,
+				idx2: 0,
+				boundary: false
+			},
+		]
+	);
+	assert_eq!(
+		navmesh.triangles[1],
+		[
+			NavEdge {
+				idx1: 0,
+				idx2: 2,
+				boundary: true
+			},
+			NavEdge {
+				idx1: 3,
+				idx2: 0,
+				boundary: false
+			},
+			NavEdge {
+				idx1: 2,
+				idx2: 3,
+				boundary: true
+			},
+		]
+	);
 }

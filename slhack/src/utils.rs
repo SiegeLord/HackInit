@@ -372,16 +372,17 @@ pub fn nearest_poly_point(vs: &[Point2<f32>], test_point: Point2<f32>) -> Point2
 	best_point
 }
 
-pub fn is_inside_poly(vs: &[Point2<f32>], test_point: Point2<f32>) -> bool
+/// vtx have to be clockwise, and convex
+pub fn is_inside_poly(vtxs: &[Point2<f32>], test_point: Point2<f32>) -> bool
 {
 	// Clockwise.
-	assert!(vs.len() >= 3);
+	assert!(vtxs.len() >= 3);
 	let mut inside = true;
 
-	for idx in 0..vs.len()
+	for idx in 0..vtxs.len()
 	{
-		let v1 = vs[idx];
-		let v2 = vs[(idx + 1) % vs.len()];
+		let v1 = vtxs[idx];
+		let v2 = vtxs[(idx + 1) % vtxs.len()];
 		let v1_v2 = v2 - v1;
 		let normal = Vector2::new(-v1_v2.y, v1_v2.x);
 
