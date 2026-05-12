@@ -80,7 +80,7 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 	fn pos_to_idx(&self, pos: Point3<f32>) -> Option<i32>
 	{
 		let mut best_idx = None;
-		let mut best_distance = std::f32::INFINITY;
+		let mut best_distance = f32::INFINITY;
 		for (i, node) in self.nodes.iter().enumerate()
 		{
 			let distance = (pos - node.get_pos()).norm();
