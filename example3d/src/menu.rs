@@ -23,7 +23,7 @@ impl Menu
 	pub fn new(state: &mut game_state::GameState) -> Result<Self>
 	{
 		state.hs.paused = false;
-		state.hs.hide_mouse = true;
+		state.hs.hide_mouse = false;
 		state.sfx.cache_sample("data/ui1.ogg")?;
 		state.sfx.cache_sample("data/ui2.ogg")?;
 		state.cache_sprite("data/title.cfg")?;
@@ -38,18 +38,6 @@ impl Menu
 		&mut self, event: &Event, state: &mut game_state::GameState,
 	) -> Result<Option<game_state::NextScreen>>
 	{
-		match *event
-		{
-			Event::MouseAxes { x, y, .. } =>
-			{
-				if state.hs.track_mouse
-				{
-					let (x, y) = state.hs.transform_mouse(x as f32, y as f32);
-					state.hs.mouse_pos = Point2::new(x as i32, y as i32);
-				}
-			}
-			_ => (),
-		}
 		if let Some(action) = self.subscreens.input(state, event)?
 		{
 			match action

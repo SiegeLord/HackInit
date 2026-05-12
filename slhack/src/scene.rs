@@ -58,8 +58,8 @@ pub struct Mesh<MaterialKindT: MaterialKind>
 {
 	pub vtxs: Vec<MeshVertex>,
 	pub idxs: Vec<i32>,
-	pub vertex_buffer: VertexBuffer<MeshVertex>,
-	pub index_buffer: IndexBuffer<u32>,
+	pub vertex_buffer: Option<VertexBuffer<MeshVertex>>,
+	pub index_buffer: Option<IndexBuffer<u32>>,
 	pub material: Option<Material<MaterialKindT>>,
 }
 
@@ -317,45 +317,52 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 		{
 			for mesh in meshes
 			{
-				core.set_shader_uniform(
-					"material",
-					&[mesh
+				if let (Some(vertex_buffer), Some(index_buffer)) =
+					(&mesh.vertex_buffer, &mesh.index_buffer)
+				{
+					core.set_shader_uniform(
+						"material",
+						&[mesh
+							.material
+							.as_ref()
+							.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
+							.unwrap_or(0)][..],
+					)
+					.ok();
+					let bitmap = mesh
 						.material
 						.as_ref()
-						.map(|m| Into::<i32>::into(m.desc.material_kind.clone()))
-						.unwrap_or(0)][..],
-				)
-				.ok();
-				let bitmap = mesh
-					.material
-					.as_ref()
-					.and_then(|m| bitmap_fn(&m, &m.desc.texture));
-				if let Some(bitmap) = bitmap
-				{
-					let material = mesh.material.as_ref().unwrap();
-					core.set_shader_uniform(
-						"tex_size",
-						&[[bitmap.get_width() as f32, bitmap.get_height() as f32]][..],
-					)
-					.ok();
-					core.set_shader_uniform("frame_ms", &[material.desc.frame_ms][..])
+						.and_then(|m| bitmap_fn(&m, &m.desc.texture));
+					if let Some(bitmap) = bitmap
+					{
+						let material = mesh.material.as_ref().unwrap();
+						core.set_shader_uniform(
+							"tex_size",
+							&[[bitmap.get_width() as f32, bitmap.get_height() as f32]][..],
+						)
 						.ok();
-					core.set_shader_uniform("num_frames", &[material.desc.num_frames as i32][..])
+						core.set_shader_uniform("frame_ms", &[material.desc.frame_ms][..])
+							.ok();
+						core.set_shader_uniform(
+							"num_frames",
+							&[material.desc.num_frames as i32][..],
+						)
 						.ok();
-					core.set_shader_uniform(
-						"frame_dxy",
-						&[[material.desc.frame_dx as f32, material.desc.frame_dy as f32]][..],
-					)
-					.ok();
+						core.set_shader_uniform(
+							"frame_dxy",
+							&[[material.desc.frame_dx as f32, material.desc.frame_dy as f32]][..],
+						)
+						.ok();
+					}
+					prim.draw_indexed_buffer(
+						vertex_buffer,
+						bitmap,
+						index_buffer,
+						0,
+						mesh.idxs.len() as u32,
+						PrimType::TriangleList,
+					);
 				}
-				prim.draw_indexed_buffer(
-					&mesh.vertex_buffer,
-					bitmap,
-					&mesh.index_buffer,
-					0,
-					mesh.idxs.len() as u32,
-					PrimType::TriangleList,
-				);
 			}
 		}
 	}
@@ -469,8 +476,8 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 						vtxs: mesh.vtxs.clone(),
 						idxs: mesh.idxs.clone(),
 						material: mesh.material.clone(),
-						vertex_buffer: vertex_buffer,
-						index_buffer: index_buffer,
+						vertex_buffer: Some(vertex_buffer),
+						index_buffer: Some(index_buffer),
 					});
 				}
 				ObjectKind::MultiMesh { meshes: new_meshes }
@@ -495,7 +502,7 @@ pub struct Scene<MaterialKindT: MaterialKind>
 
 impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 {
-	pub fn load(display: &mut Display, prim: &PrimitivesAddon, file: &str) -> Result<Self>
+	pub fn load(display: Option<&mut Display>, prim: &PrimitivesAddon, file: &str) -> Result<Self>
 	{
 		if file.ends_with("obj")
 		{
@@ -507,7 +514,9 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 		}
 	}
 
-	pub fn load_obj(display: &mut Display, prim: &PrimitivesAddon, obj_file: &str) -> Result<Self>
+	pub fn load_obj(
+		mut display: Option<&mut Display>, prim: &PrimitivesAddon, obj_file: &str,
+	) -> Result<Self>
 	{
 		let obj_str = std::fs::read_to_string(obj_file)?;
 		let obj_set = wavefront_obj::obj::parse(obj_str)
@@ -593,8 +602,16 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 						})
 					})?;
 
-				let (vertex_buffer, index_buffer) =
-					create_buffers(display, prim, &vtxs, &idxs, false)?;
+				let (vertex_buffer, index_buffer) = if let Some(display) = &mut display
+				{
+					let (vertex_buffer, index_buffer) =
+						create_buffers(display, prim, &vtxs, &idxs, false)?;
+					(Some(vertex_buffer), Some(index_buffer))
+				}
+				else
+				{
+					(None, None)
+				};
 
 				meshes.push(Mesh {
 					vtxs: vtxs,
@@ -628,8 +645,9 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 		Ok(Self { objects: objects })
 	}
 
-	pub fn load_gltf(display: &mut Display, prim: &PrimitivesAddon, gltf_file: &str)
-	-> Result<Self>
+	pub fn load_gltf(
+		mut display: Option<&mut Display>, prim: &PrimitivesAddon, gltf_file: &str,
+	) -> Result<Self>
 	{
 		let (document, buffers, _) = gltf::import(gltf_file)?;
 		let mut objects = vec![];
@@ -900,8 +918,16 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 							})
 						})?;
 
-					let (vertex_buffer, index_buffer) =
-						create_buffers(display, prim, &vtxs, &idxs, false)?;
+					let (vertex_buffer, index_buffer) = if let Some(display) = &mut display
+					{
+						let (vertex_buffer, index_buffer) =
+							create_buffers(*display, prim, &vtxs, &idxs, false)?;
+						(Some(vertex_buffer), Some(index_buffer))
+					}
+					else
+					{
+						(None, None)
+					};
 
 					meshes.push(Mesh {
 						vtxs: vtxs,
@@ -1023,8 +1049,8 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 							vtxs: mesh.vtxs.clone(),
 							idxs: new_indices,
 							material: mesh.material.clone(),
-							vertex_buffer: vertex_buffer,
-							index_buffer: index_buffer,
+							vertex_buffer: Some(vertex_buffer),
+							index_buffer: Some(index_buffer),
 						});
 					}
 					ObjectKind::MultiMesh { meshes: new_meshes }

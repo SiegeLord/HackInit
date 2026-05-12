@@ -225,11 +225,10 @@ impl GameState
 		let scene = match self.scenes.entry(name.to_string())
 		{
 			Entry::Occupied(o) => o.into_mut(),
-			Entry::Vacant(v) => v.insert(Scene::load(
-				&mut self.hs.display.as_mut().unwrap(),
-				&self.hs.prim,
-				name,
-			)?),
+			Entry::Vacant(v) =>
+			{
+				v.insert(Scene::load(self.hs.display.as_mut(), &self.hs.prim, name)?)
+			}
 		};
 		Ok(scene)
 	}

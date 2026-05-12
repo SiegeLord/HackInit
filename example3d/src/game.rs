@@ -48,18 +48,6 @@ impl Game
 		&mut self, event: &Event, state: &mut game_state::GameState,
 	) -> Result<Option<game_state::NextScreen>>
 	{
-		match *event
-		{
-			Event::MouseAxes { x, y, .. } =>
-			{
-				if state.hs.track_mouse
-				{
-					let (x, y) = state.hs.transform_mouse(x as f32, y as f32);
-					state.hs.mouse_pos = Point2::new(x as i32, y as i32);
-				}
-			}
-			_ => (),
-		}
 		if self.subscreens.is_empty()
 		{
 			let mut in_game_menu = false;

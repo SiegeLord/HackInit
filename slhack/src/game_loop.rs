@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::{hack_state, utils};
+use nalgebra::Point2;
 
 use allegro::*;
 
@@ -230,6 +231,20 @@ pub fn game_loop<LoopStateT: LoopState>(state: &mut LoopStateT, options: Options
 		let event = queue.get_next_event();
 		state.hs().game_ui_controls.decode_event(&event);
 		state.hs().menu_controls.decode_event(&event);
+
+		match event
+		{
+			Event::MouseAxes { x, y, .. } =>
+			{
+				if state.hs().track_mouse
+				{
+					let (x, y) = state.hs().transform_mouse(x as f32, y as f32);
+					state.hs().mouse_pos = Point2::new(x as i32, y as i32);
+				}
+			}
+			_ => (),
+		}
+
 		state.input(&event)?;
 		state.hs().game_ui_controls.clear_action_states();
 		state.hs().menu_controls.clear_action_states();

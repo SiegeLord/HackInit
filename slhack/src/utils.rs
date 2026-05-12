@@ -23,6 +23,19 @@ pub fn projection_transform(dw: f32, dh: f32, fov: f32) -> Perspective3<f32>
 	Perspective3::new(dw / dh, fov, 0.01, 200.)
 }
 
+pub fn transform_to_mat4(trans: &Transform) -> Matrix4<f32>
+{
+	let mut mat = Matrix4::zeros();
+	for i in 0..4
+	{
+		for j in 0..4
+		{
+			mat[(i, j)] = trans.get_matrix()[j][i];
+		}
+	}
+	mat
+}
+
 pub fn mat4_to_transform(mat: Matrix4<f32>) -> Transform
 {
 	let mut trans = Transform::identity();
