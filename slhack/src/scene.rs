@@ -1148,13 +1148,19 @@ pub struct NavNode
 	pub neighbours: Vec<i32>,
 }
 
+//#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+//struct NavTriangle
+//{
+//	idxs: [usize; 3],
+//	edges: [NavEdge; 3],
+//}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct NavEdge
 {
 	/// Index into navnodes.
 	idx1: usize,
 	idx2: usize,
-	boundary: bool,
 }
 
 impl NavEdge
@@ -1164,7 +1170,18 @@ impl NavEdge
 		Self {
 			idx1: idx1,
 			idx2: idx2,
-			boundary: false,
+		}
+	}
+
+	fn id(&self) -> (usize, usize)
+	{
+		if self.idx1 < self.idx2
+		{
+			(self.idx1, self.idx2)
+		}
+		else
+		{
+			(self.idx2, self.idx1)
 		}
 	}
 }
@@ -1173,7 +1190,7 @@ impl NavEdge
 pub struct NavMesh
 {
 	pub nodes: Vec<NavNode>,
-	/// The starts of the edges are unique.
+	/// The starts of the edges are the triangle vertices.
 	triangles: Vec<[NavEdge; 3]>,
 }
 
@@ -1195,7 +1212,7 @@ impl NavMesh
 		let mut vtx_id_to_new_idx = HashMap::new();
 		// We use a second set of indicies to map the original vertices to the deduplicated ones.
 		let mut new_idxs = vec![];
-		let mut old_idxs = vec![];
+		let mut new_idx_to_old_idx = HashMap::new();
 		let mut cur_idx = 0;
 		for (old_idx, vtx) in vtxs.iter().enumerate()
 		{
@@ -1203,50 +1220,35 @@ impl NavMesh
 			let new_idx = *vtx_id_to_new_idx.entry(vtx_id).or_insert_with(|| {
 				let new_idx = cur_idx;
 				cur_idx += 1;
-				old_idxs.push(old_idx);
+				new_idx_to_old_idx.insert(new_idx, old_idx);
 				new_idx
 			});
 			new_idxs.push(new_idx);
 		}
 
-		// Create a map from vertex index to its neighbours (including itself).
-		// They key is the deduplicated indices.
-		// Also, construct the triangles + the edge counts.
-		let mut new_vtx_idx_to_neighbours = HashMap::new();
 		let mut triangles = vec![];
-		let mut edge_to_count = HashMap::new();
-		for triangle in idxs.chunks(3)
+		let mut edge_id_to_triangle_idxs = HashMap::new();
+		for (triangle_idx, vtx_idxs) in idxs.chunks(3).enumerate()
 		{
-			for &vtx_idx in triangle
-			{
-				new_vtx_idx_to_neighbours
-					.entry(new_idxs[vtx_idx as usize])
-					.or_insert(vec![])
-					.extend([
-						new_idxs[triangle[0] as usize],
-						new_idxs[triangle[1] as usize],
-						new_idxs[triangle[2] as usize],
-					]);
-			}
 			let mut edges = [
 				NavEdge::new(
-					new_idxs[triangle[0] as usize],
-					new_idxs[triangle[1] as usize],
+					new_idxs[vtx_idxs[0] as usize],
+					new_idxs[vtx_idxs[1] as usize],
 				),
 				NavEdge::new(
-					new_idxs[triangle[1] as usize],
-					new_idxs[triangle[2] as usize],
+					new_idxs[vtx_idxs[1] as usize],
+					new_idxs[vtx_idxs[2] as usize],
 				),
 				NavEdge::new(
-					new_idxs[triangle[2] as usize],
-					new_idxs[triangle[0] as usize],
+					new_idxs[vtx_idxs[2] as usize],
+					new_idxs[vtx_idxs[0] as usize],
 				),
 			];
 
 			// Make sure the triangle is clockwise.
-			let v1 = vtxs[triangle[0] as usize];
-			let v2 = vtxs[triangle[1] as usize];
-			let v3 = vtxs[triangle[2] as usize];
+			let v1 = vtxs[vtx_idxs[0] as usize];
+			let v2 = vtxs[vtx_idxs[1] as usize];
+			let v3 = vtxs[vtx_idxs[2] as usize];
 
 			let d1 = v2 - v1;
 			let d2 = v3 - v1;
@@ -1259,37 +1261,35 @@ impl NavMesh
 
 			for edge in &edges
 			{
-				*edge_to_count.entry(edge.clone()).or_insert(0) += 1;
+				edge_id_to_triangle_idxs
+					.entry(edge.id())
+					.or_insert(vec![])
+					.push(triangle_idx);
 			}
 			triangles.push(edges);
 		}
 
-		// Triangle edges that are part of only 1 triangle are boundary triangles.
-		for triangle in &mut triangles
+		// Create the navigation nodes from triangles.
+		let mut nodes = vec![];
+		for (triangle_idx, triangle) in triangles.iter().enumerate()
 		{
+			let mut pos = Vector3::zeros();
+			let mut neighbours = vec![];
 			for edge in triangle
 			{
-				edge.boundary = edge_to_count[edge] == 1;
-			}
-		}
-
-		// Construct the navigation nodes.
-		let mut nodes = vec![];
-		for (new_idx, &old_idx) in old_idxs.iter().enumerate()
-		{
-			let new_idx = new_idx;
-			let mut neighbours = vec![];
-			for &neighbour_vtx_idx in &new_vtx_idx_to_neighbours[&new_idx]
-			{
-				if neighbour_vtx_idx != new_idx
+				pos += vtxs[new_idx_to_old_idx[&edge.idx1]].coords;
+				for other_triangle_idx in &edge_id_to_triangle_idxs[&edge.id()]
 				{
-					neighbours.push(neighbour_vtx_idx as i32);
+					if *other_triangle_idx != triangle_idx
+					{
+						neighbours.push(*other_triangle_idx as i32);
+					}
 				}
 			}
-			neighbours.sort();
-			neighbours.dedup();
+			pos /= triangle.len() as f32;
+
 			let node = NavNode {
-				pos: vtxs[old_idx],
+				pos: pos.into(),
 				neighbours: neighbours,
 			};
 			nodes.push(node);
@@ -1354,44 +1354,37 @@ fn test_navmesh()
 
 	let navmesh = NavMesh::new(&vtxs, &idxs);
 
+	assert_eq!(navmesh.nodes.len(), 2);
+
+	approx::assert_abs_diff_eq!(
+		navmesh.nodes[0].pos,
+		((vtxs[0].coords + vtxs[1].coords + vtxs[3].coords) / 3.).into(),
+		epsilon = 1e-5,
+	);
+
+	approx::assert_abs_diff_eq!(
+		navmesh.nodes[1].pos,
+		((vtxs[0].coords + vtxs[2].coords + vtxs[3].coords) / 3.).into(),
+		epsilon = 1e-5,
+	);
+
+	assert_eq!(navmesh.nodes[0].neighbours, [1]);
+	assert_eq!(navmesh.nodes[1].neighbours, [0]);
+
 	assert_eq!(
 		navmesh.triangles[0],
 		[
-			NavEdge {
-				idx1: 0,
-				idx2: 1,
-				boundary: true
-			},
-			NavEdge {
-				idx1: 1,
-				idx2: 3,
-				boundary: true
-			},
-			NavEdge {
-				idx1: 3,
-				idx2: 0,
-				boundary: false
-			},
+			NavEdge { idx1: 0, idx2: 1 },
+			NavEdge { idx1: 1, idx2: 3 },
+			NavEdge { idx1: 3, idx2: 0 },
 		]
 	);
 	assert_eq!(
 		navmesh.triangles[1],
 		[
-			NavEdge {
-				idx1: 0,
-				idx2: 2,
-				boundary: true
-			},
-			NavEdge {
-				idx1: 3,
-				idx2: 0,
-				boundary: false
-			},
-			NavEdge {
-				idx1: 2,
-				idx2: 3,
-				boundary: true
-			},
+			NavEdge { idx1: 0, idx2: 2 },
+			NavEdge { idx1: 3, idx2: 0 },
+			NavEdge { idx1: 2, idx2: 3 },
 		]
 	);
 }
