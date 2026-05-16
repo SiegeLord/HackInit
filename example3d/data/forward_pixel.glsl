@@ -14,6 +14,7 @@ uniform sampler2D al_tex;
 uniform sampler2D lightmap;
 
 uniform int material;
+uniform vec4 base_color;
 
 void main()
 {
@@ -22,7 +23,7 @@ void main()
     if (tex_color.a == 0.0) discard;
     position_buffer = varying_pos;
     normal_buffer = vec4(normalize(varying_normal), float(material));
-    albedo_buffer = varying_color * tex_color;
+    albedo_buffer = base_color * varying_color * tex_color;
 
     vec4 light = vec4(vec3(0.05), 0.);
     if (material == STATIC_MATERIAL)

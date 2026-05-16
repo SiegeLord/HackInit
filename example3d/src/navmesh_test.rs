@@ -14,13 +14,13 @@ use slhack::{controls, scene, sprite, ui as slhack_ui};
 use std::collections::HashMap;
 use std::f32::consts::PI;
 
-pub struct Game
+pub struct NavMeshTest
 {
 	map: Map,
 	subscreens: ui::SubScreens,
 }
 
-impl Game
+impl NavMeshTest
 {
 	pub fn new(state: &mut game_state::GameState) -> Result<Self>
 	{
@@ -140,7 +140,12 @@ pub fn spawn_light(
 struct Map
 {
 	world: hecs::World,
+
+	navmesh: scene::NavMesh,
 	camera_target: Point3<f32>,
+	camera_elev: f32,
+	camera_azim: f32,
+	camera_radius: f32,
 }
 
 impl Map
@@ -149,25 +154,65 @@ impl Map
 	{
 		let mut world = hecs::World::new();
 		spawn_obj(Point3::new(0., 0., 0.), &mut world)?;
-		game_state::cache_scene(state, "data/test_level_sprytile.glb")?;
+		game_state::cache_scene(state, "data/navmesh_test.glb")?;
 		state.cache_bitmap("data/level_lightmap.png")?;
 		game_state::cache_scene(state, "data/sphere.glb")?;
+		game_state::cache_scene(state, "data/cube.glb")?;
 		game_state::cache_scene(state, "data/test.obj")?;
 
-		let level_scene = state.get_scene("data/test_level_sprytile.glb").unwrap();
+		let level_scene = state.get_scene("data/navmesh_test.glb").unwrap();
+		let mut navmesh = None;
 		for object in &level_scene.objects
 		{
-			if let scene::ObjectKind::Light { color, intensity } = object.kind
+			match &object.kind
 			{
-				spawn_light(
-					object.pos,
-					comps::Light {
-						color: color,
-						intensity: intensity / 50.,
-						static_: true,
-					},
-					&mut world,
-				)?;
+				scene::ObjectKind::Light { color, intensity } =>
+				{
+					spawn_light(
+						object.pos,
+						comps::Light {
+							color: *color,
+							intensity: intensity / 50.,
+							static_: true,
+						},
+						&mut world,
+					)?;
+				}
+				scene::ObjectKind::NavMesh { navmesh: n } =>
+				{
+					navmesh = Some(n.clone());
+				}
+				_ => (),
+			}
+		}
+		let navmesh = navmesh.unwrap();
+
+		for node in &navmesh.nodes
+		{
+			world.spawn((
+				*comps::Position::new(node.pos).set_scale(Vector3::from_element(0.5)),
+				comps::Scene::new("data/sphere.glb")
+					.set_color(Color::from_rgb_f(0., 0., 1.))
+					.clone(),
+			));
+
+			for neighbour in &node.neighbours
+			{
+				let start = node.pos;
+				let end = navmesh.nodes[*neighbour as usize].pos;
+
+				let center = start + (end - start) * 0.25;
+				let length = (end - start).norm() / 2.;
+				let rot = UnitQuaternion::face_towards(&(end - start), &Vector3::y_axis());
+
+				world.spawn((
+					*comps::Position::new(center)
+						.set_scale(Vector3::new(0.25, 0.25, length))
+						.set_rot(rot),
+					comps::Scene::new("data/cube.glb")
+						.set_color(Color::from_rgb_f(0., 1., 1.))
+						.clone(),
+				));
 			}
 		}
 
@@ -183,7 +228,11 @@ impl Map
 
 		Ok(Self {
 			world: world,
-			camera_target: Point3::origin(),
+			camera_target: Point3::new(3., 2., -3.),
+			camera_elev: 0.,
+			camera_azim: 0.,
+			camera_radius: 1.,
+			navmesh: navmesh,
 		})
 	}
 
@@ -192,9 +241,6 @@ impl Map
 	{
 		let mut to_die = vec![];
 
-		let t = -(state.hs.time() / 3.);
-		self.camera_target = Point3::new(20. * t.cos() as f32 - 2., 1., 20. * t.sin() as f32 - 1.);
-
 		// Position snapshotting.
 		for (_, position) in self.world.query::<&mut comps::Position>().iter()
 		{
@@ -202,6 +248,64 @@ impl Map
 		}
 
 		// Input.
+		let want_left = state
+			.controls
+			.get_action_state(game_state::Action::RotateViewLeft);
+		let want_right = state
+			.controls
+			.get_action_state(game_state::Action::RotateViewRight);
+		let want_up = state
+			.controls
+			.get_action_state(game_state::Action::RotateViewUp);
+		let want_down = state
+			.controls
+			.get_action_state(game_state::Action::RotateViewDown);
+
+		let want_move_left = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewLeft);
+		let want_move_right = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewRight);
+		let want_move_forward = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewForward);
+		let want_move_back = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewBackward);
+		let want_move_up = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewUp);
+		let want_move_down = state
+			.controls
+			.get_action_state(game_state::Action::MoveViewDown);
+
+		let want_zoom_in = state.controls.get_action_state(game_state::Action::ZoomIn) > 0.5;
+		let want_zoom_out = state.controls.get_action_state(game_state::Action::ZoomOut) > 0.5;
+
+		if state
+			.controls
+			.get_action_state(game_state::Action::RotateView)
+			> 0.5
+		{
+			let s = 1.;
+			self.camera_azim -= 2. * s * DT * want_left;
+			self.camera_azim += 2. * s * DT * want_right;
+
+			self.camera_elev -= s * DT * want_up;
+			self.camera_elev += s * DT * want_down;
+			self.camera_elev = utils::clamp(self.camera_elev, -PI / 2. + 1e-3, PI / 2. - 1e-3);
+		}
+		self.camera_radius *=
+			1.1_f32.powf(want_zoom_out as i32 as f32 - want_zoom_in as i32 as f32);
+		let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), -self.camera_azim);
+		let left_right =
+			rot * (Vector3::z_axis().into_inner() * (want_move_left - want_move_right));
+		let fwd_bwd = rot * (Vector3::x_axis().into_inner() * (want_move_back - want_move_forward));
+		let up_down = Vector3::y_axis().into_inner() * (want_move_up - want_move_down);
+
+		self.camera_target += 5. * (left_right + fwd_bwd + up_down) * DT;
+
 		//if state.controls.get_action_state(game_state::Action::Move) > 0.5
 		//{
 		//	for (_, position) in self.world.query::<&mut comps::Position>().iter()
@@ -242,12 +346,22 @@ impl Map
 
 	fn make_project(&self, state: &game_state::GameState) -> Perspective3<f32>
 	{
-		utils::projection_transform(state.hs.buffer_width(), state.hs.buffer_height(), PI / 3.)
+		let buffer_width = state.hs.buffer_width();
+		let buffer_height = state.hs.buffer_height();
+		let fov = PI / 3.;
+		Perspective3::new(buffer_width / buffer_height, fov, 0.1, 100.)
 	}
 
 	fn camera_pos(&self) -> Point3<f32>
 	{
-		Point3::new(4., 2., 0.)
+		let radius = self.camera_radius;
+		let proj_radius = radius * self.camera_elev.cos();
+
+		Point3::new(
+			proj_radius * self.camera_azim.cos(),
+			radius * self.camera_elev.sin(),
+			proj_radius * self.camera_azim.sin(),
+		) + self.camera_target.coords
 	}
 
 	fn make_camera(&self) -> Isometry3<f32>
@@ -307,16 +421,13 @@ impl Map
 			.core
 			.set_shader_sampler("lightmap", state.get_bitmap("data/level_lightmap.png")?, 1)
 			.ok();
-		state
-			.get_scene("data/test_level_sprytile.glb")
-			.unwrap()
-			.draw(
-				&state.hs.core,
-				&state.hs.prim,
-				|_, _| None,
-				material_mapper,
-				|_, _, _| {},
-			);
+		state.get_scene("data/navmesh_test.glb").unwrap().draw(
+			&state.hs.core,
+			&state.hs.prim,
+			|_, _| None,
+			material_mapper,
+			|_, _, _| {},
+		);
 
 		for (_, (position, scene)) in self
 			.world
@@ -351,6 +462,12 @@ impl Map
 						)
 						.ok();
 				};
+
+			state
+				.hs
+				.core
+				.set_shader_uniform("base_color", &[scene.color.to_rgba_array_f()][..])
+				.ok();
 
 			state.get_scene(&scene.scene).unwrap().draw(
 				&state.hs.core,

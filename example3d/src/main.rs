@@ -9,6 +9,7 @@ mod error;
 mod game;
 mod game_state;
 mod menu;
+mod navmesh_test;
 mod ui;
 
 use crate::error::{Result, ResultHelper};
@@ -19,6 +20,7 @@ use slhack::{deferred, game_loop, hack_state, utils};
 pub enum Screen
 {
 	Game(game::Game),
+	NavMeshTest(navmesh_test::NavMeshTest),
 	Menu(menu::Menu),
 }
 
@@ -27,6 +29,25 @@ pub struct LoopState
 	game_state: game_state::GameState,
 	next_screen: Option<game_state::NextScreen>,
 	cur_screen: Option<Screen>,
+}
+
+macro_rules! enum_dispatch {
+	($expr:expr, ($($variant:path),*), $method:ident $args:tt) =>
+	{
+		match $expr
+		{
+			$(
+				$variant(s) => s.$method $args,
+			)*
+		}
+	}
+}
+
+macro_rules! screen_dispatch {
+	($expr:expr, $method:ident $args:tt) =>
+	{
+		enum_dispatch!($expr, (Screen::Game, Screen::NavMeshTest, Screen::Menu), $method $args)
+	}
 }
 
 impl LoopState
@@ -87,7 +108,10 @@ impl game_loop::LoopState for LoopState
 		)?);
 		game_state.resize_display().into_slhack()?;
 
-		self.cur_screen = Some(Screen::Menu(menu::Menu::new(game_state).into_slhack()?));
+		//self.cur_screen = Some(Screen::Menu(menu::Menu::new(game_state).into_slhack()?));
+		self.cur_screen = Some(Screen::NavMeshTest(
+			navmesh_test::NavMeshTest::new(game_state).into_slhack()?,
+		));
 		Ok(())
 	}
 
@@ -96,8 +120,7 @@ impl game_loop::LoopState for LoopState
 		self.game_state.resize_display().into_slhack()?;
 		match &mut self.cur_screen
 		{
-			Some(Screen::Menu(menu)) => menu.resize(&mut self.game_state),
-			Some(Screen::Game(game)) => game.resize(&mut self.game_state),
+			Some(s) => screen_dispatch!(s, resize(&mut self.game_state)),
 			None => (),
 		}
 		Ok(())
@@ -107,8 +130,7 @@ impl game_loop::LoopState for LoopState
 	{
 		match &mut self.cur_screen
 		{
-			Some(Screen::Menu(menu)) => menu.draw(&mut self.game_state),
-			Some(Screen::Game(game)) => game.draw(&mut self.game_state),
+			Some(s) => screen_dispatch!(s, draw(&mut self.game_state)),
 			None => Ok(()),
 		}
 		.into_slhack()
@@ -119,8 +141,7 @@ impl game_loop::LoopState for LoopState
 		self.game_state.controls.decode_event(event);
 		self.next_screen = match &mut self.cur_screen
 		{
-			Some(Screen::Menu(menu)) => menu.input(event, &mut self.game_state),
-			Some(Screen::Game(game)) => game.input(event, &mut self.game_state),
+			Some(s) => screen_dispatch!(s, input(event, &mut self.game_state)),
 			None => Ok(None),
 		}
 		.into_slhack()?;
@@ -134,7 +155,8 @@ impl game_loop::LoopState for LoopState
 			self.next_screen = match &mut self.cur_screen
 			{
 				Some(Screen::Menu(_)) => Ok(None),
-				Some(Screen::Game(game)) => game.logic(&mut self.game_state),
+				Some(Screen::Game(s)) => s.logic(&mut self.game_state),
+				Some(Screen::NavMeshTest(s)) => s.logic(&mut self.game_state),
 				None => Ok(None),
 			}
 			.into_slhack()?;
