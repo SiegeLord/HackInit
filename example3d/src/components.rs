@@ -100,3 +100,27 @@ impl Scene
 		self
 	}
 }
+
+#[derive(Debug, Clone)]
+pub struct AdditiveScene
+{
+	pub scene: String,
+	pub color: Color,
+}
+
+impl AdditiveScene
+{
+	pub fn new(scene: &str) -> Self
+	{
+		Self {
+			scene: scene.to_string(),
+			color: Color::from_rgb_f(1., 1., 1.),
+		}
+	}
+
+	pub fn set_color(&mut self, color: Color) -> &mut Self
+	{
+		self.color = color;
+		self
+	}
+}

@@ -99,8 +99,8 @@ impl Animation
 
 	fn compute_start_end(&mut self)
 	{
-		let mut min = std::f64::MAX;
-		let mut max = std::f64::MIN;
+		let mut min = f64::MAX;
+		let mut max = f64::MIN;
 		let mut valid = false;
 		if !self.pos_track.is_empty()
 		{
@@ -289,12 +289,16 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 	}
 
 	pub fn draw<
-		'l,
-		MaterialFn: Fn(&Material<MaterialKindT>, &str) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
+		ExtraT,
+		MaterialFn: for<'l> Fn(
+			&Material<MaterialKindT>,
+			&str,
+			&'l ExtraT,
+		) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
 		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
 	>(
 		&self, core: &Core, prim: &PrimitivesAddon, animation_state: Option<&AnimationState>,
-		material_fn: MaterialFn, pos_fn: PosFn,
+		material_fn: MaterialFn, pos_fn: PosFn, extra: &ExtraT,
 	)
 	{
 		if let Some(state) = animation_state
@@ -316,7 +320,7 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 					let (material, bitmap) = mesh
 						.material
 						.as_ref()
-						.and_then(|m| material_fn(m, &m.desc.texture))
+						.and_then(|m| material_fn(m, &m.desc.texture, extra))
 						.map(|(m, b)| (Some(m), Some(b)))
 						.unwrap_or((None, None));
 
@@ -478,6 +482,66 @@ impl<MaterialKindT: MaterialKind> Object<MaterialKindT>
 				}
 				ObjectKind::MultiMesh { meshes: new_meshes }
 			}
+		};
+		Ok(Self {
+			name: self.name.clone(),
+			pos: self.pos.clone(),
+			rot: self.rot.clone(),
+			scale: self.scale.clone(),
+			kind: kind,
+			animations: self.animations.clone(),
+			properties: self.properties.clone(),
+		})
+	}
+
+	pub fn create_mesh_from_navmesh(
+		&self, display: &mut Display, prim: &PrimitivesAddon,
+		material: Option<&Material<MaterialKindT>>,
+	) -> Result<Self>
+	{
+		let kind = match &self.kind
+		{
+			ObjectKind::NavMesh { navmesh } =>
+			{
+				let mut vtxs = Vec::with_capacity(navmesh.vtxs.len());
+				for vtx in &navmesh.vtxs
+				{
+					vtxs.push(MeshVertex {
+						x: vtx.x,
+						y: vtx.y,
+						z: vtx.z,
+						u: 0.,
+						v: 0.,
+						u2: 0.,
+						v2: 0.,
+						nx: 0.,
+						ny: 1.,
+						nz: 0.,
+						color: Color::from_rgb_f(1., 1., 1.),
+					});
+				}
+
+				let mut idxs = Vec::with_capacity(navmesh.nodes.len() * 3);
+				for node in &navmesh.nodes
+				{
+					idxs.push(node.triangle[0].idx1 as i32);
+					idxs.push(node.triangle[1].idx1 as i32);
+					idxs.push(node.triangle[2].idx1 as i32);
+				}
+
+				let (vertex_buffer, index_buffer) =
+					create_buffers(display, prim, &vtxs, &idxs, false)?;
+
+				let mesh = Mesh {
+					vtxs: vtxs.clone(),
+					idxs: idxs.clone(),
+					material: material.cloned(),
+					vertex_buffer: Some(vertex_buffer),
+					index_buffer: Some(index_buffer),
+				};
+				ObjectKind::MultiMesh { meshes: vec![mesh] }
+			}
+			_ => return Err(format!("This object is not a NavMesh.").into()),
 		};
 		Ok(Self {
 			name: self.name.clone(),
@@ -999,13 +1063,17 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 	}
 
 	pub fn draw<
-		'l,
-		AnimationFn: Fn(usize, &Object<MaterialKindT>) -> Option<&'l AnimationState>,
-		MaterialFn: Fn(&Material<MaterialKindT>, &str) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
+		ExtraT,
+		AnimationFn: Fn(usize, &Object<MaterialKindT>) -> Option<&AnimationState>,
+		MaterialFn: for<'l> Fn(
+			&Material<MaterialKindT>,
+			&str,
+			&'l ExtraT,
+		) -> Option<(Material<MaterialKindT>, &'l Bitmap)>,
 		PosFn: Fn(Point3<f32>, UnitQuaternion<f32>, Vector3<f32>) -> (),
 	>(
 		&self, core: &Core, prim: &PrimitivesAddon, animation_state_fn: AnimationFn,
-		material_fn: MaterialFn, pos_fn: PosFn,
+		material_fn: MaterialFn, pos_fn: PosFn, extra: &ExtraT,
 	)
 	{
 		for (idx, object) in self.objects.iter().enumerate()
@@ -1016,6 +1084,7 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 				animation_state_fn(idx, object),
 				&material_fn,
 				&pos_fn,
+				extra,
 			);
 		}
 	}
@@ -1092,6 +1161,24 @@ impl<MaterialKindT: MaterialKind + DeserializeOwned> Scene<MaterialKindT>
 
 		Ok(Scene { objects: objects })
 	}
+
+	/// Creates a mesh from the first NavMesh in the scene.
+	pub fn create_mesh_from_navmesh(
+		&self, display: &mut Display, prim: &PrimitivesAddon,
+		material: Option<&Material<MaterialKindT>>,
+	) -> Result<Option<Self>>
+	{
+		for obj in &self.objects
+		{
+			if let ObjectKind::NavMesh { .. } = obj.kind
+			{
+				return obj
+					.create_mesh_from_navmesh(display, prim, material)
+					.map(|o| Some(Scene { objects: vec![o] }));
+			}
+		}
+		Ok(None)
+	}
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1146,19 +1233,14 @@ pub struct NavNode
 {
 	pub pos: Point3<f32>,
 	pub neighbours: Vec<i32>,
+	/// The starts of the edges are the triangle vertices.
+	triangle: [NavEdge; 3],
 }
-
-//#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-//struct NavTriangle
-//{
-//	idxs: [usize; 3],
-//	edges: [NavEdge; 3],
-//}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct NavEdge
 {
-	/// Index into navnodes.
+	/// Index into vertices of the navmesh (not the nodes).
 	idx1: usize,
 	idx2: usize,
 }
@@ -1190,8 +1272,7 @@ impl NavEdge
 pub struct NavMesh
 {
 	pub nodes: Vec<NavNode>,
-	/// The starts of the edges are the triangle vertices.
-	triangles: Vec<[NavEdge; 3]>,
+	vtxs: Vec<Point3<f32>>,
 }
 
 impl NavMesh
@@ -1209,6 +1290,7 @@ impl NavMesh
 				(pos.z / tol) as i32,
 			)
 		};
+		let mut new_vtxs = vec![];
 		let mut vtx_id_to_new_idx = HashMap::new();
 		// We use a second set of indicies to map the original vertices to the deduplicated ones.
 		let mut new_idxs = vec![];
@@ -1221,6 +1303,7 @@ impl NavMesh
 				let new_idx = cur_idx;
 				cur_idx += 1;
 				new_idx_to_old_idx.insert(new_idx, old_idx);
+				new_vtxs.push(*vtx);
 				new_idx
 			});
 			new_idxs.push(new_idx);
@@ -1245,7 +1328,7 @@ impl NavMesh
 				),
 			];
 
-			// Make sure the triangle is clockwise.
+			// Make sure the triangle is counter-clockwise.
 			let v1 = vtxs[vtx_idxs[0] as usize];
 			let v2 = vtxs[vtx_idxs[1] as usize];
 			let v3 = vtxs[vtx_idxs[2] as usize];
@@ -1254,7 +1337,7 @@ impl NavMesh
 			let d2 = v3 - v1;
 
 			// N.B. Y up.
-			if d1.cross(&d2).dot(&Vector3::y_axis()) > 0.
+			if d1.cross(&d2).dot(&Vector3::y_axis()) < 0.
 			{
 				edges.swap(1, 2);
 			}
@@ -1277,7 +1360,7 @@ impl NavMesh
 			let mut neighbours = vec![];
 			for edge in triangle
 			{
-				pos += vtxs[new_idx_to_old_idx[&edge.idx1]].coords;
+				pos += new_vtxs[edge.idx1].coords;
 				for other_triangle_idx in &edge_id_to_triangle_idxs[&edge.id()]
 				{
 					if *other_triangle_idx != triangle_idx
@@ -1291,13 +1374,14 @@ impl NavMesh
 			let node = NavNode {
 				pos: pos.into(),
 				neighbours: neighbours,
+				triangle: triangle.clone(),
 			};
 			nodes.push(node);
 		}
 
 		Self {
+			vtxs: new_vtxs.to_vec(),
 			nodes: nodes,
-			triangles: triangles,
 		}
 	}
 }
@@ -1372,7 +1456,7 @@ fn test_navmesh()
 	assert_eq!(navmesh.nodes[1].neighbours, [0]);
 
 	assert_eq!(
-		navmesh.triangles[0],
+		navmesh.nodes[0].triangle,
 		[
 			NavEdge { idx1: 0, idx2: 1 },
 			NavEdge { idx1: 1, idx2: 3 },
@@ -1380,7 +1464,7 @@ fn test_navmesh()
 		]
 	);
 	assert_eq!(
-		navmesh.triangles[1],
+		navmesh.nodes[1].triangle,
 		[
 			NavEdge { idx1: 0, idx2: 2 },
 			NavEdge { idx1: 3, idx2: 0 },

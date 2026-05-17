@@ -293,14 +293,16 @@ impl Map
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
 
-		let material_mapper = |material: &scene::Material<game_state::MaterialKind>,
-		                       texture_name: &str|
-		 -> Option<(scene::Material<game_state::MaterialKind>, &Bitmap)> {
+		fn material_mapper<'l>(
+			material: &scene::Material<game_state::MaterialKind>, texture_name: &str,
+			state: &'l game_state::GameState,
+		) -> Option<(scene::Material<game_state::MaterialKind>, &'l Bitmap)>
+		{
 			state
 				.get_bitmap(texture_name)
 				.map(|b| (material.clone(), b))
 				.ok()
-		};
+		}
 
 		state
 			.hs
@@ -316,6 +318,7 @@ impl Map
 				|_, _| None,
 				material_mapper,
 				|_, _, _| {},
+				state,
 			);
 
 		for (_, (position, scene)) in self
@@ -358,6 +361,7 @@ impl Map
 				|_, _| None,
 				material_mapper,
 				pos_fn,
+				state,
 			);
 		}
 
@@ -411,8 +415,9 @@ impl Map
 					&state.hs.core,
 					&state.hs.prim,
 					|_, _| None,
-					|m, s| state.get_bitmap(s).map(|b| (m.clone(), b)).ok(),
+					|m, s, state| state.get_bitmap(s).map(|b| (m.clone(), b)).ok(),
 					|_, _, _| {},
+					state,
 				);
 			}
 		}

@@ -84,6 +84,11 @@ impl game_loop::LoopState for LoopState
 			"data/basic",
 			&replacements,
 		)?);
+		game_state.eager_shader = Some(utils::load_shader(
+			hs.display_mut(),
+			"data/eager",
+			&replacements,
+		)?);
 		game_state.forward_shader = Some(utils::load_shader(
 			hs.display_mut(),
 			"data/forward",

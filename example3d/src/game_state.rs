@@ -160,6 +160,8 @@ pub struct GameState
 	pub controls: controls::ControlsHandler<Action>,
 
 	pub basic_shader: Option<Shader>,
+	pub eager_shader: Option<Shader>,
+
 	pub forward_shader: Option<Shader>,
 	pub light_shader: Option<Shader>,
 	pub final_shader: Option<Shader>,
@@ -209,6 +211,7 @@ impl GameState
 			atlas: atlas::Atlas::new(1024),
 			controls: controls,
 			basic_shader: None,
+			eager_shader: None,
 			forward_shader: None,
 			light_shader: None,
 			final_shader: None,
@@ -285,6 +288,20 @@ impl GameState
 			.scenes
 			.get(name)
 			.ok_or_else(|| format!("{name} is not cached!"))?)
+	}
+
+	pub fn with_scene<T>(
+		&mut self, name: &str, scene_fn: impl FnOnce(&Scene, &mut GameState) -> Result<T>,
+	) -> Result<T>
+	{
+		let mut dummy_scenes = HashMap::new();
+		std::mem::swap(&mut dummy_scenes, &mut self.scenes);
+		let scene = dummy_scenes
+			.get(name)
+			.ok_or_else(|| format!("{name} is not cached!"))?;
+		let res = scene_fn(scene, self);
+		std::mem::swap(&mut dummy_scenes, &mut self.scenes);
+		res
 	}
 }
 

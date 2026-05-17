@@ -187,6 +187,27 @@ impl Map
 		}
 		let navmesh = navmesh.unwrap();
 
+		let navmesh_scene = state
+			.with_scene("data/navmesh_test.glb", |scene, state| {
+				Ok(scene.create_mesh_from_navmesh(
+					state.hs.display.as_mut().unwrap(),
+					&state.hs.prim,
+					Some(&scene::Material {
+						name: "navmesh_material".to_string(),
+						desc: utils::load_config("data/navmesh_material.cfg")?,
+					}),
+				)?)
+			})?
+			.unwrap();
+		state.insert_scene("navmesh_scene", navmesh_scene);
+
+		world.spawn((
+			comps::Position::new(Point3::origin()),
+			comps::AdditiveScene::new("navmesh_scene")
+				.set_color(Color::from_rgb_f(0., 0.5, 0.))
+				.clone(),
+		));
+
 		for node in &navmesh.nodes
 		{
 			world.spawn((
@@ -407,28 +428,45 @@ impl Map
 			.set_shader_transform("model_matrix", &utils::mat4_to_transform(shift))
 			.ok();
 
-		let material_mapper = |material: &scene::Material<game_state::MaterialKind>,
-		                       texture_name: &str|
-		 -> Option<(scene::Material<game_state::MaterialKind>, &Bitmap)> {
+		fn material_mapper<'l>(
+			material: &scene::Material<game_state::MaterialKind>, texture_name: &str,
+			state: &'l game_state::GameState,
+		) -> Option<(scene::Material<game_state::MaterialKind>, &'l Bitmap)>
+		{
+			if material.desc.two_sided
+			{
+				unsafe {
+					gl::Disable(gl::CULL_FACE);
+				}
+			}
+			else
+			{
+				unsafe {
+					gl::Enable(gl::CULL_FACE);
+				}
+			}
 			state
 				.get_bitmap(texture_name)
 				.map(|b| (material.clone(), b))
 				.ok()
-		};
+		}
 
 		state
 			.hs
 			.core
 			.set_shader_sampler("lightmap", state.get_bitmap("data/level_lightmap.png")?, 1)
 			.ok();
-		state.get_scene("data/navmesh_test.glb").unwrap().draw(
+
+		state.get_scene("data/navmesh_test.glb")?.draw(
 			&state.hs.core,
 			&state.hs.prim,
 			|_, _| None,
 			material_mapper,
 			|_, _, _| {},
+			state,
 		);
 
+		// Solid pass.
 		for (_, (position, scene)) in self
 			.world
 			.query::<(&comps::Position, &comps::Scene)>()
@@ -475,6 +513,7 @@ impl Map
 				|_, _| None,
 				material_mapper,
 				pos_fn,
+				state,
 			);
 		}
 
@@ -528,8 +567,9 @@ impl Map
 					&state.hs.core,
 					&state.hs.prim,
 					|_, _| None,
-					|m, s| state.get_bitmap(s).map(|b| (m.clone(), b)).ok(),
+					|m, s, state| state.get_bitmap(s).map(|b| (m.clone(), b)).ok(),
 					|_, _, _| {},
+					state,
 				);
 			}
 		}
@@ -541,6 +581,73 @@ impl Map
 			state.final_shader.as_ref().unwrap(),
 			state.hs.buffer1.as_ref().unwrap(),
 		)?;
+
+		// Forward Additive pass.
+		state
+			.hs
+			.core
+			.use_shader(Some(state.eager_shader.as_ref().unwrap()))
+			.unwrap();
+		state
+			.hs
+			.core
+			.use_projection_transform(&utils::mat4_to_transform(project.to_homogeneous()));
+		state.hs.core.set_depth_test(Some(DepthFunction::Less));
+		state
+			.hs
+			.core
+			.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::One);
+
+		for (_, (position, scene)) in self
+			.world
+			.query::<(&comps::Position, &comps::AdditiveScene)>()
+			.iter()
+		{
+			// TODO: I bet we can fix pos_fn in the same way we fixed material_mapper.
+			let shift = Isometry3 {
+				translation: position.draw_pos(alpha).coords.into(),
+				rotation: position.draw_rot(alpha),
+			}
+			.to_homogeneous();
+			let scale = Matrix4::new_nonuniform_scaling(&position.draw_scale(alpha));
+
+			let pos_fn =
+				|obj_pos: Point3<f32>, obj_rot: UnitQuaternion<f32>, obj_scale: Vector3<f32>| {
+					let obj_shift = Isometry3 {
+						translation: obj_pos.coords.into(),
+						rotation: obj_rot.into(),
+					}
+					.to_homogeneous();
+					let obj_scale = Matrix4::new_nonuniform_scaling(&obj_scale);
+
+					state.hs.core.use_transform(&utils::mat4_to_transform(
+						camera.to_homogeneous() * shift * scale * obj_shift * obj_scale,
+					));
+					state
+						.hs
+						.core
+						.set_shader_transform(
+							"model_matrix",
+							&utils::mat4_to_transform(shift * scale * obj_shift * obj_scale),
+						)
+						.ok();
+				};
+
+			state
+				.hs
+				.core
+				.set_shader_uniform("base_color", &[scene.color.to_rgba_array_f()][..])
+				.ok();
+
+			state.get_scene(&scene.scene).unwrap().draw(
+				&state.hs.core,
+				&state.hs.prim,
+				|_, _| None,
+				material_mapper,
+				pos_fn,
+				state,
+			);
+		}
 
 		state
 			.hs
@@ -555,6 +662,19 @@ impl Map
 			.hs
 			.core
 			.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::InverseAlpha);
+		let ortho_mat = Matrix4::new_orthographic(
+			0.,
+			state.hs.buffer_width() as f32,
+			state.hs.buffer_height() as f32,
+			0.,
+			state.hs.buffer_height(),
+			-state.hs.buffer_height(),
+		);
+		state
+			.hs
+			.core
+			.use_projection_transform(&utils::mat4_to_transform(ortho_mat));
+		state.hs.core.use_transform(&Transform::identity());
 		Ok(())
 	}
 }
