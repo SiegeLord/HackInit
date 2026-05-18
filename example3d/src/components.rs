@@ -40,6 +40,13 @@ impl Position
 		}
 	}
 
+	pub fn set_pos(&mut self, pos: Point3<f32>) -> &mut Self
+	{
+		self.pos = pos;
+		self.old_pos = pos;
+		self
+	}
+
 	pub fn set_rot(&mut self, rot: UnitQuaternion<f32>) -> &mut Self
 	{
 		self.rot = rot;
@@ -48,6 +55,20 @@ impl Position
 	}
 
 	pub fn set_scale(&mut self, scale: Vector3<f32>) -> &mut Self
+	{
+		self.scale = scale;
+		self.old_scale = scale;
+		self
+	}
+
+	pub fn with_rot(mut self, rot: UnitQuaternion<f32>) -> Self
+	{
+		self.rot = rot;
+		self.old_rot = rot;
+		self
+	}
+
+	pub fn with_scale(mut self, scale: Vector3<f32>) -> Self
 	{
 		self.scale = scale;
 		self.old_scale = scale;
@@ -94,7 +115,7 @@ impl Scene
 		}
 	}
 
-	pub fn set_color(&mut self, color: Color) -> &mut Self
+	pub fn set_color(mut self, color: Color) -> Self
 	{
 		self.color = color;
 		self

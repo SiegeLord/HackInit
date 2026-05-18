@@ -94,7 +94,7 @@ actions! {
 		RotateViewRight = [Some(controls::Input::MouseXPos), None],
 		RotateViewUp = [Some(controls::Input::MouseYNeg), None],
 		RotateViewDown = [Some(controls::Input::MouseYPos), None],
-		RotateView = [Some(controls::Input::MouseButton(1)), None],
+		RotateView = [Some(controls::Input::MouseButton(3)), None],
 		MoveViewLeft = [Some(controls::Input::Keyboard(KeyCode::A)), None],
 		MoveViewRight = [Some(controls::Input::Keyboard(KeyCode::D)), None],
 		MoveViewForward = [Some(controls::Input::Keyboard(KeyCode::W)), None],
@@ -103,6 +103,8 @@ actions! {
 		MoveViewDown = [Some(controls::Input::Keyboard(KeyCode::LShift)), None],
 		ZoomIn = [Some(controls::Input::MouseZPos), None],
 		ZoomOut = [Some(controls::Input::MouseZNeg), None],
+		SelectSource = [Some(controls::Input::MouseButton(1)), None],
+		SelectTarget = [Some(controls::Input::MouseButton(2)), None],
 	}
 }
 
