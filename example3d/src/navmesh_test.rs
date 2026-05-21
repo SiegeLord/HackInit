@@ -20,7 +20,7 @@ use rapier3d::geometry::{
 	SharedShape, TriMeshFlags,
 };
 use rapier3d::pipeline::{ActiveEvents, EventHandler, PhysicsPipeline, QueryFilter, QueryPipeline};
-use slhack::{controls, scene, sprite, ui as slhack_ui};
+use slhack::{astar, controls, scene, sprite, ui as slhack_ui};
 
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -381,6 +381,9 @@ struct Map
 
 	source: hecs::Entity,
 	target: hecs::Entity,
+
+	path_nodes: Vec<hecs::Entity>,
+	path_edges: Vec<hecs::Entity>,
 }
 
 impl Map
@@ -518,6 +521,8 @@ impl Map
 			navmesh: navmesh,
 			source: source,
 			target: target,
+			path_nodes: vec![],
+			path_edges: vec![],
 		})
 	}
 
@@ -600,8 +605,10 @@ impl Map
 
 		self.camera_target += 5. * (left_right + fwd_bwd + up_down) * DT;
 
+		let mut make_path = false;
 		if want_set_source || want_set_target
 		{
+			make_path = true;
 			let mouse_pos = state.hs.mouse_pos.coords.cast::<f32>();
 			let buffer_size = Vector2::new(state.hs.buffer_width(), state.hs.buffer_height());
 			let mouse_pos_view = (mouse_pos - buffer_size / 2.)
@@ -630,6 +637,63 @@ impl Map
 				};
 				let mut position = self.world.get::<&mut comps::Position>(entity).unwrap();
 				position.set_pos(pos);
+			}
+		}
+
+		if make_path
+		{
+			to_die.extend(self.path_nodes.drain(..));
+			to_die.extend(self.path_edges.drain(..));
+
+			let dist_fn = |from: &scene::NavNode, to: &scene::NavNode| (from.pos - to.pos).norm();
+			let source = self.world.get::<&comps::Position>(self.source).unwrap().pos;
+			let target = self.world.get::<&comps::Position>(self.target).unwrap().pos;
+
+			let (source_idx, proj_source) = self.navmesh.project_point(source);
+			let (target_idx, proj_target) = self.navmesh.project_point(target);
+
+			let source = proj_source;
+			let target = proj_target;
+
+			let mut astar_ctx = astar::AStarContext::new(&self.navmesh.nodes);
+			let mut path = astar_ctx.solve(
+				source_idx.unwrap() as i32,
+				target_idx.unwrap() as i32,
+				dist_fn,
+			);
+
+			if path.len() >= 2
+			{
+				path.insert(0, target);
+				path.push(source);
+
+				for pos in &path
+				{
+					self.path_nodes.push(self.world.spawn((
+						comps::Position::new(*pos).with_scale(Vector3::from_element(1.)),
+						comps::Scene::new("data/cube.glb").set_color(Color::from_rgb_f(1., 0., 1.)),
+					)));
+				}
+
+				for start_end in path.windows(2)
+				{
+					if let [start, end] = start_end
+					{
+						let center = start + (end - start) * 0.5;
+						let length = (end - start).norm();
+						let rot = UnitQuaternion::face_towards(&(end - start), &Vector3::y_axis());
+
+						self.path_edges.push(
+							self.world.spawn((
+								comps::Position::new(center)
+									.with_scale(Vector3::new(0.3, 0.3, length))
+									.with_rot(rot),
+								comps::Scene::new("data/cube.glb")
+									.set_color(Color::from_rgb_f(1., 0., 1.)),
+							)),
+						);
+					}
+				}
 			}
 		}
 

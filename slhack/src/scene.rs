@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::utils;
 use gltf::animation::util::ReadInputs;
 use gltf::animation::util::ReadOutputs;
-use nalgebra::{Point3, UnitQuaternion, Vector3};
+use nalgebra::{Point2, Point3, UnitQuaternion, Vector3};
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
 
@@ -1384,6 +1384,77 @@ impl NavMesh
 			nodes: nodes,
 		}
 	}
+
+	pub fn project_point(&self, pos: Point3<f32>) -> (Option<usize>, Point3<f32>)
+	{
+		if self.nodes.is_empty()
+		{
+			return (None, pos);
+		}
+
+		let mut best_dist = f32::INFINITY;
+		let mut best_triangle = None;
+		let mut best_proj_pos = pos;
+
+		// TODO: Accelerate this using a spatial index.
+		for (node_idx, node) in self.nodes.iter().enumerate()
+		{
+			let v1 = self.vtxs[node.triangle[0].idx1];
+			let v2 = self.vtxs[node.triangle[1].idx1];
+			let v3 = self.vtxs[node.triangle[2].idx1];
+
+			let d1 = (v2 - v1).normalize();
+			let d2 = (v3 - v1).normalize();
+
+			let up = d1.cross(&d2).normalize();
+			let fwd = d1;
+			let left = fwd.cross(&up).normalize();
+
+			// TODO: Use matrix multiplication.
+			let p1 = Point2::origin();
+			let p2 = Point2::new((v2 - v1).dot(&fwd), (v2 - v1).dot(&left));
+			let p3 = Point2::new((v3 - v1).dot(&fwd), (v3 - v1).dot(&left));
+			let ppos = Point2::new((pos - v1).dot(&fwd), (pos - v1).dot(&left));
+
+			let in_triangle = utils::is_inside_poly(&[p1, p3, p2], ppos);
+
+			let n12 = utils::nearest_line_point_3d(v1, v2, pos);
+			let n13 = utils::nearest_line_point_3d(v1, v3, pos);
+			let n23 = utils::nearest_line_point_3d(v2, v3, pos);
+
+			let perp_dist = (pos - v1).dot(&up);
+			let proj_pos = pos - up * perp_dist;
+
+			let mut best_tri_dist = if in_triangle
+			{
+				perp_dist.abs()
+			}
+			else
+			{
+				f32::INFINITY
+			};
+			let mut best_tri_pos = proj_pos;
+
+			for cand_pos in [n12, n13, n23]
+			{
+				let cand_dist = (cand_pos - pos).norm();
+				if cand_dist < best_tri_dist
+				{
+					best_tri_dist = cand_dist;
+					best_tri_pos = cand_pos;
+				}
+			}
+
+			if best_tri_dist < best_dist
+			{
+				best_triangle = Some(node_idx);
+				best_dist = best_tri_dist;
+				best_proj_pos = best_tri_pos;
+			}
+		}
+
+		(best_triangle, best_proj_pos)
+	}
 }
 
 impl astar::Node for NavNode
@@ -1459,16 +1530,16 @@ fn test_navmesh()
 		navmesh.nodes[0].triangle,
 		[
 			NavEdge { idx1: 0, idx2: 1 },
-			NavEdge { idx1: 1, idx2: 3 },
 			NavEdge { idx1: 3, idx2: 0 },
+			NavEdge { idx1: 1, idx2: 3 },
 		]
 	);
 	assert_eq!(
 		navmesh.nodes[1].triangle,
 		[
 			NavEdge { idx1: 0, idx2: 2 },
-			NavEdge { idx1: 3, idx2: 0 },
 			NavEdge { idx1: 2, idx2: 3 },
+			NavEdge { idx1: 3, idx2: 0 },
 		]
 	);
 }

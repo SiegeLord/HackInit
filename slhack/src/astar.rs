@@ -100,12 +100,9 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 
 	/// N.B. this returns the path in reverse order.
 	pub fn solve<C: Fn(&NodeT, &NodeT) -> f32>(
-		&mut self, from: Point3<f32>, to: Point3<f32>, cost_fn: C,
+		&mut self, from_idx: i32, to_idx: i32, cost_fn: C,
 	) -> Vec<Point3<f32>>
 	{
-		let from_idx = self.pos_to_idx(from).unwrap();
-		let to_idx = self.pos_to_idx(to).unwrap();
-
 		self.open_set.clear();
 		for i in 0..self.came_from.len()
 		{
@@ -123,7 +120,6 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 		let mut best_score_so_far = self.heuristic(from_idx, to_idx);
 		let mut best_idx_so_far = -1;
 
-		let to_idx = self.pos_to_idx(to).unwrap();
 		while !self.open_set.is_empty()
 		{
 			let cur = self.open_set.pop().unwrap();
@@ -131,7 +127,7 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 			if cur.idx == to_idx
 			{
 				let mut cur_idx = to_idx;
-				let mut path = vec![to];
+				let mut path = vec![self.nodes[to_idx as usize].get_pos()];
 				//~ println!("Start {:?} {:?}", from, to);
 				loop
 				{

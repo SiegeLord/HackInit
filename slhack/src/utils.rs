@@ -350,6 +350,32 @@ pub fn nearest_line_point(v1: Point2<f32>, v2: Point2<f32>, test_point: Point2<f
 	}
 }
 
+// TODO: Generalize this.
+pub fn nearest_line_point_3d(
+	v1: Point3<f32>, v2: Point3<f32>, test_point: Point3<f32>,
+) -> Point3<f32>
+{
+	let v1_t = test_point - v1;
+
+	let v2_v1 = v2 - v1;
+	let v2_v1_norm_sq = max(v2_v1.norm_squared(), 1e-20);
+
+	let dot = v1_t.dot(&v2_v1) / v2_v1_norm_sq;
+
+	if dot < 0.
+	{
+		v1
+	}
+	else if dot > 1.
+	{
+		v2
+	}
+	else
+	{
+		v1 + dot * (v2 - v1)
+	}
+}
+
 pub fn nearest_poly_point(vs: &[Point2<f32>], test_point: Point2<f32>) -> Point2<f32>
 {
 	assert!(vs.len() >= 3);
@@ -372,10 +398,9 @@ pub fn nearest_poly_point(vs: &[Point2<f32>], test_point: Point2<f32>) -> Point2
 	best_point
 }
 
-/// vtx have to be clockwise, and convex
+/// vtx have to be counter-clockwise, and convex
 pub fn is_inside_poly(vtxs: &[Point2<f32>], test_point: Point2<f32>) -> bool
 {
-	// Clockwise.
 	assert!(vtxs.len() >= 3);
 	let mut inside = true;
 
@@ -387,7 +412,7 @@ pub fn is_inside_poly(vtxs: &[Point2<f32>], test_point: Point2<f32>) -> bool
 		let normal = Vector2::new(-v1_v2.y, v1_v2.x);
 
 		let v1_t = test_point - v1;
-		inside &= v1_t.dot(&normal) < 0.;
+		inside &= v1_t.dot(&normal) > 0.;
 		if !inside
 		{
 			return false;
@@ -551,9 +576,9 @@ fn test_is_inside_poly()
 {
 	let vs = [
 		Point2::new(0., 0.),
-		Point2::new(0., 3.),
-		Point2::new(3., 3.),
 		Point2::new(3., 0.),
+		Point2::new(3., 3.),
+		Point2::new(0., 3.),
 	];
 
 	assert!(is_inside_poly(&vs, Point2::new(1., 1.)));
@@ -561,9 +586,9 @@ fn test_is_inside_poly()
 
 	let vs = [
 		Point2::new(-1., 1.),
-		Point2::new(1., 3.),
-		Point2::new(4., -3.),
 		Point2::new(-1., -1.),
+		Point2::new(4., -3.),
+		Point2::new(1., 3.),
 	];
 	assert!(is_inside_poly(&vs, Point2::new(0., 0.)));
 }

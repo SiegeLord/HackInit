@@ -29,9 +29,9 @@ impl Rect
 	pub fn intersects_with_segment(&self, start: Point2<f32>, end: Point2<f32>) -> bool
 	{
 		let v1 = self.start;
-		let v2 = Point2::new(self.end.x, self.start.y);
+		let v2 = Point2::new(self.start.x, self.end.y);
 		let v3 = self.end;
-		let v4 = Point2::new(self.start.x, self.end.y);
+		let v4 = Point2::new(self.end.x, self.start.y);
 
 		//~ dbg!(v1, v2, v3, v4);
 
