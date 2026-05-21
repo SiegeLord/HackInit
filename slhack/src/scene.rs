@@ -1228,21 +1228,29 @@ unsafe impl VertexType for MeshVertex
 	}
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NavNeighbour
+{
+	pub neighbour: i32,
+	pub edge: i32,
+}
+
 #[derive(Clone, Debug)]
 pub struct NavNode
 {
 	pub pos: Point3<f32>,
-	pub neighbours: Vec<i32>,
+	/// First elementa parallel array to triangle edges.
+	pub neighbours: Vec<NavNeighbour>,
 	/// The starts of the edges are the triangle vertices.
-	triangle: [NavEdge; 3],
+	pub triangle: [NavEdge; 3],
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct NavEdge
+pub struct NavEdge
 {
 	/// Index into vertices of the navmesh (not the nodes).
-	idx1: usize,
-	idx2: usize,
+	pub idx1: usize,
+	pub idx2: usize,
 }
 
 impl NavEdge
@@ -1272,7 +1280,7 @@ impl NavEdge
 pub struct NavMesh
 {
 	pub nodes: Vec<NavNode>,
-	vtxs: Vec<Point3<f32>>,
+	pub vtxs: Vec<Point3<f32>>,
 }
 
 impl NavMesh
@@ -1358,14 +1366,17 @@ impl NavMesh
 		{
 			let mut pos = Vector3::zeros();
 			let mut neighbours = vec![];
-			for edge in triangle
+			for (edge_idx, edge) in triangle.iter().enumerate()
 			{
 				pos += new_vtxs[edge.idx1].coords;
 				for other_triangle_idx in &edge_id_to_triangle_idxs[&edge.id()]
 				{
 					if *other_triangle_idx != triangle_idx
 					{
-						neighbours.push(*other_triangle_idx as i32);
+						neighbours.push(NavNeighbour {
+							neighbour: *other_triangle_idx as i32,
+							edge: edge_idx as i32,
+						});
 					}
 				}
 			}
@@ -1464,9 +1475,9 @@ impl astar::Node for NavNode
 		self.pos
 	}
 
-	fn get_neighbours(&self) -> &[i32]
+	fn get_neighbours(&self) -> impl Iterator<Item = i32>
 	{
-		&self.neighbours
+		self.neighbours.iter().map(|n| n.neighbour)
 	}
 }
 
@@ -1523,8 +1534,20 @@ fn test_navmesh()
 		epsilon = 1e-5,
 	);
 
-	assert_eq!(navmesh.nodes[0].neighbours, [1]);
-	assert_eq!(navmesh.nodes[1].neighbours, [0]);
+	assert_eq!(
+		navmesh.nodes[0].neighbours,
+		[NavNeighbour {
+			neighbour: 1,
+			edge: 1
+		}]
+	);
+	assert_eq!(
+		navmesh.nodes[1].neighbours,
+		[NavNeighbour {
+			neighbour: 0,
+			edge: 2
+		}]
+	);
 
 	assert_eq!(
 		navmesh.nodes[0].triangle,

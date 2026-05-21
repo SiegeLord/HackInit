@@ -367,6 +367,12 @@ impl Physics
 	}
 }
 
+enum PathStyle
+{
+	TriCenters,
+	EdgeCenters,
+}
+
 struct Map
 {
 	world: hecs::World,
@@ -382,6 +388,7 @@ struct Map
 	source: hecs::Entity,
 	target: hecs::Entity,
 
+	path_style: PathStyle,
 	path_nodes: Vec<hecs::Entity>,
 	path_edges: Vec<hecs::Entity>,
 }
@@ -475,7 +482,7 @@ impl Map
 			for neighbour in &node.neighbours
 			{
 				let start = node.pos;
-				let end = navmesh.nodes[*neighbour as usize].pos;
+				let end = navmesh.nodes[neighbour.neighbour as usize].pos;
 
 				let center = start + (end - start) * 0.25;
 				let length = (end - start).norm() / 2.;
@@ -523,6 +530,7 @@ impl Map
 			target: target,
 			path_nodes: vec![],
 			path_edges: vec![],
+			path_style: PathStyle::TriCenters,
 		})
 	}
 
@@ -606,6 +614,23 @@ impl Map
 		self.camera_target += 5. * (left_right + fwd_bwd + up_down) * DT;
 
 		let mut make_path = false;
+		if state
+			.controls
+			.get_action_state(game_state::Action::SwitchPathStyle)
+			> 0.5
+		{
+			self.path_style = match self.path_style
+			{
+				PathStyle::TriCenters => PathStyle::EdgeCenters,
+				PathStyle::EdgeCenters => PathStyle::TriCenters,
+			};
+			state
+				.controls
+				.clear_action_state(game_state::Action::SwitchPathStyle);
+
+			make_path = true;
+		}
+
 		if want_set_source || want_set_target
 		{
 			make_path = true;
@@ -656,13 +681,49 @@ impl Map
 			let target = proj_target;
 
 			let mut astar_ctx = astar::AStarContext::new(&self.navmesh.nodes);
-			let mut path = astar_ctx.solve(
+			let path = astar_ctx.solve(
 				source_idx.unwrap() as i32,
 				target_idx.unwrap() as i32,
 				dist_fn,
 			);
+			let path_found = !path.is_empty();
 
-			if path.len() >= 2
+			let mut new_path;
+			match self.path_style
+			{
+				PathStyle::TriCenters =>
+				{
+					new_path = path
+						.iter()
+						.map(|idx| self.navmesh.nodes[*idx as usize].pos)
+						.collect();
+				}
+				PathStyle::EdgeCenters =>
+				{
+					new_path = vec![];
+					for path_edge in path.windows(2)
+					{
+						let from_idx = path_edge[0];
+						let to_idx = path_edge[1];
+
+						let node = &self.navmesh.nodes[from_idx as usize];
+						let neighbour = node
+							.neighbours
+							.iter()
+							.find(|n| n.neighbour == to_idx)
+							.unwrap();
+						let neighbour_edge = &node.triangle[neighbour.edge as usize];
+
+						let edge_start = self.navmesh.vtxs[neighbour_edge.idx1];
+						let edge_end = self.navmesh.vtxs[neighbour_edge.idx2];
+
+						new_path.push(edge_start + (edge_end - edge_start) * 0.5);
+					}
+				}
+			}
+			let mut path = new_path;
+
+			if path_found
 			{
 				path.insert(0, target);
 				path.push(source);

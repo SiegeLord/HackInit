@@ -105,6 +105,7 @@ actions! {
 		ZoomOut = [Some(controls::Input::MouseZNeg), None],
 		SelectSource = [Some(controls::Input::MouseButton(1)), None],
 		SelectTarget = [Some(controls::Input::MouseButton(2)), None],
+		SwitchPathStyle = [Some(controls::Input::Keyboard(KeyCode::Enter)), None],
 	}
 }
 

@@ -49,7 +49,8 @@ impl Eq for NodeAndScore {}
 pub trait Node
 {
 	fn get_pos(&self) -> Point3<f32>;
-	fn get_neighbours(&self) -> &[i32];
+	//fn get_neighbours(&self) -> &[i32];
+	fn get_neighbours(&self) -> impl Iterator<Item = i32>;
 }
 
 pub struct AStarContext<'n, NodeT>
@@ -77,31 +78,10 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 		(self.nodes[from as usize].get_pos() - self.nodes[to as usize].get_pos()).norm()
 	}
 
-	fn pos_to_idx(&self, pos: Point3<f32>) -> Option<i32>
-	{
-		let mut best_idx = None;
-		let mut best_distance = f32::INFINITY;
-		for (i, node) in self.nodes.iter().enumerate()
-		{
-			let distance = (pos - node.get_pos()).norm();
-			if distance < best_distance
-			{
-				best_idx = Some(i as i32);
-				best_distance = distance;
-			}
-		}
-		best_idx
-	}
-
-	fn idx_to_pos(&self, idx: i32) -> Point3<f32>
-	{
-		self.nodes[idx as usize].get_pos()
-	}
-
 	/// N.B. this returns the path in reverse order.
 	pub fn solve<C: Fn(&NodeT, &NodeT) -> f32>(
 		&mut self, from_idx: i32, to_idx: i32, cost_fn: C,
-	) -> Vec<Point3<f32>>
+	) -> Vec<i32>
 	{
 		self.open_set.clear();
 		for i in 0..self.came_from.len()
@@ -124,16 +104,23 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 		{
 			let cur = self.open_set.pop().unwrap();
 			//~ println!("Trying {:?}", cur);
+
+			// We found it.
 			if cur.idx == to_idx
 			{
 				let mut cur_idx = to_idx;
-				let mut path = vec![self.nodes[to_idx as usize].get_pos()];
+				let mut path = vec![to_idx];
 				//~ println!("Start {:?} {:?}", from, to);
 				loop
 				{
 					//~ println!("Reconstructing: {}", cur_idx);
 					cur_idx = self.came_from[cur_idx as usize];
-					path.push(self.idx_to_pos(cur_idx));
+					// XXX: Is this right? We do this to avoid having paths that touch the same
+					// node.
+					if cur_idx != to_idx
+					{
+						path.push(cur_idx);
+					}
 					if cur_idx == from_idx
 					{
 						//~ path.reverse();
@@ -144,7 +131,7 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 				}
 			}
 
-			for &next_idx in self.nodes[cur.idx as usize].get_neighbours()
+			for next_idx in self.nodes[cur.idx as usize].get_neighbours()
 			{
 				let new_cost = self.cost[cur.idx as usize]
 					+ cost_fn(
@@ -167,16 +154,18 @@ impl<'n, NodeT: Node> AStarContext<'n, NodeT>
 				}
 			}
 		}
+
+		// We did not find it, return a partial path.
 		if best_idx_so_far > -1
 		{
 			let mut cur_idx = best_idx_so_far;
-			let mut path = vec![self.idx_to_pos(cur_idx)];
+			let mut path = vec![cur_idx];
 			//~ println!("Start {:?} {:?}", from, to);
 			loop
 			{
 				//~ println!("Reconstructing: {}", cur_idx);
 				cur_idx = self.came_from[cur_idx as usize];
-				path.push(self.idx_to_pos(cur_idx));
+				path.push(cur_idx);
 				if cur_idx == from_idx
 				{
 					//~ path.reverse();
