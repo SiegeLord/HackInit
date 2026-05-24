@@ -1466,6 +1466,142 @@ impl NavMesh
 
 		(best_triangle, best_proj_pos)
 	}
+
+	/// N.B. the path is reversed.
+	pub fn plan_path(
+		&self, source: Point3<f32>, target: Point3<f32>, num_iterations: i32,
+	) -> Vec<Point3<f32>>
+	{
+		let dist_fn = |from: &NavNode, to: &NavNode| (from.pos - to.pos).norm();
+
+		let (source_idx, proj_source) = self.project_point(source);
+		let (target_idx, proj_target) = self.project_point(target);
+
+		let source = proj_source;
+		let target = proj_target;
+
+		let mut astar_ctx = astar::AStarContext::new(&self.nodes);
+		let path = astar_ctx.solve(
+			source_idx.unwrap() as i32,
+			target_idx.unwrap() as i32,
+			dist_fn,
+		);
+		let path_found = !path.is_empty();
+
+		let mut edges = vec![];
+
+		for path_edge in path.windows(2)
+		{
+			let from_idx = path_edge[0];
+			let to_idx = path_edge[1];
+
+			let node = &self.nodes[from_idx as usize];
+			let neighbour = node
+				.neighbours
+				.iter()
+				.find(|n| n.neighbour == to_idx)
+				.unwrap();
+			let neighbour_edge = &node.triangle[neighbour.edge as usize];
+
+			let edge_start = self.vtxs[neighbour_edge.idx1];
+			let edge_end = self.vtxs[neighbour_edge.idx2];
+
+			edges.push((edge_start, edge_end));
+		}
+
+		fn compute_path(
+			fracs: &[f32], source: Point3<f32>, target: Point3<f32>,
+			edges: &[(Point3<f32>, Point3<f32>)],
+		) -> Vec<Point3<f32>>
+		{
+			let mut path = vec![target];
+			for (frac, edge) in itertools::izip!(fracs, edges)
+			{
+				let (start, end) = edge;
+				path.push(start + (end - start) * *frac);
+			}
+			path.push(source);
+			path
+		}
+
+		fn relax_step(
+			fracs: &mut [f32], source: Point3<f32>, target: Point3<f32>,
+			edges: &[(Point3<f32>, Point3<f32>)],
+		)
+		{
+			let path = compute_path(fracs, source, target, edges);
+			for (frac, edge, triplet) in itertools::izip!(fracs, edges, path.windows(3))
+			{
+				if let [prev, _, next] = triplet
+				{
+					let (start, end) = edge;
+
+					let edge_vec = end - start;
+					let edge_len = edge_vec.norm();
+					let edge_dir = edge_vec / edge_len;
+
+					let epsilon = 1e-5;
+
+					let project = |point: Point3<f32>, sign: f32| {
+						let point_vec = point - start;
+						let point_len = point_vec.norm();
+						let point_x;
+						let point_y;
+						if point_len < epsilon
+						{
+							point_x = 0.;
+							point_y = 0.;
+						}
+						else
+						{
+							let point_dir = point_vec / point_len;
+							let point_cross = point_dir.cross(&edge_dir);
+							// This is perpendicular to edge_dir, lies on plane of point + edge
+							let point_edge_dir = sign * edge_dir.cross(&point_cross).normalize();
+
+							// These are in the projected coordinate system
+							point_x = point_vec.dot(&edge_dir);
+							point_y = point_vec.dot(&point_edge_dir);
+						}
+						(point_x, point_y)
+					};
+
+					let (prev_x, prev_y) = project(*prev, 1.);
+					let (next_x, next_y) = project(*next, -1.);
+
+					let path_dx = next_x - prev_x;
+					let path_dy = next_y - prev_y;
+
+					let u = if path_dy.abs() < epsilon
+					{
+						0.
+					}
+					else
+					{
+						-prev_y / path_dy
+					};
+
+					let t = (prev_x + u * path_dx) / edge_len;
+
+					let t = t.clamp(0., 1.);
+
+					let lr = 0.5;
+					*frac = *frac * (1. - lr) + t * lr;
+				}
+			}
+		}
+
+		let mut fracs = vec![0.5; edges.len()];
+		if path_found
+		{
+			for _ in 0..num_iterations
+			{
+				relax_step(&mut fracs, source, target, &edges);
+			}
+		}
+
+		compute_path(&fracs, source, target, &edges)
+	}
 }
 
 impl astar::Node for NavNode

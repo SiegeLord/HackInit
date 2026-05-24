@@ -21,6 +21,8 @@ dependencies = [
  "gl_loader",
  "gltf",
  "hecs",
+ "itertools",
+ "lbfgsb-rs-pure",
  "memoffset",
  "nalgebra",
  "rand",
@@ -655,6 +657,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a257582fdcde896fd96463bf2d40eefea0580021c0712a0e2b028b60b47a837a"
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -677,6 +688,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "lbfgsb-rs-pure"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30928f5ee13b22849e0370b237f672ba7b25c491f50a3d1fc8c468e465dfec84"
 
 [[package]]
 name = "libc"
@@ -1120,6 +1137,7 @@ dependencies = [
  "gl",
  "gl_loader",
  "gltf",
+ "itertools",
  "memoffset",
  "nalgebra",
  "rand",

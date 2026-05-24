@@ -529,6 +529,39 @@ pub fn nice_float(f: f32, max_frac_digits: usize) -> String
 	}
 }
 
+pub struct Adam
+{
+	pub m: Vec<f64>,
+	pub v: Vec<f64>,
+	pub t: i32,
+}
+
+impl Adam
+{
+	pub fn new(param_count: usize) -> Self
+	{
+		Self {
+			m: vec![0.; param_count],
+			v: vec![0.; param_count],
+			t: 1,
+		}
+	}
+
+	pub fn step(
+		&mut self, params: &mut [f64], grads: &[f64], lr: f64, beta_1: f64, beta_2: f64, eps: f64,
+	)
+	{
+		for (p, g, m, v) in itertools::izip!(params, grads, &mut self.m, &mut self.v)
+		{
+			*m = beta_1 * *m + (1.0 - beta_1) * *g;
+			*v = beta_2 * *v + (1.0 - beta_2) * *g * *g;
+			let m_hat = *m / (1.0 - beta_1.powi(self.t));
+			let v_hat = *v / (1.0 - beta_2.powi(self.t));
+			*p = *p - lr * m_hat / (v_hat.sqrt() + eps);
+		}
+	}
+}
+
 #[test]
 fn nice_float_test()
 {

@@ -367,10 +367,12 @@ impl Physics
 	}
 }
 
+#[derive(Debug)]
 enum PathStyle
 {
 	TriCenters,
 	EdgeCenters,
+	BuiltIn,
 }
 
 struct Map
@@ -521,9 +523,9 @@ impl Map
 			world: world,
 			physics: physics,
 			level_handle: level_handle,
-			camera_target: Point3::new(3., 2., -3.),
-			camera_elev: 0.,
-			camera_azim: 0.,
+			camera_target: Point3::new(3., 8., -3.),
+			camera_elev: PI / 4.,
+			camera_azim: -3. * PI / 4.,
 			camera_radius: 1.,
 			navmesh: navmesh,
 			source: source,
@@ -622,8 +624,10 @@ impl Map
 			self.path_style = match self.path_style
 			{
 				PathStyle::TriCenters => PathStyle::EdgeCenters,
-				PathStyle::EdgeCenters => PathStyle::TriCenters,
+				PathStyle::EdgeCenters => PathStyle::BuiltIn,
+				PathStyle::BuiltIn => PathStyle::TriCenters,
 			};
+			println!("Path Style: {:?}", self.path_style);
 			state
 				.controls
 				.clear_action_state(game_state::Action::SwitchPathStyle);
@@ -696,11 +700,14 @@ impl Map
 					new_path = path
 						.iter()
 						.map(|idx| self.navmesh.nodes[*idx as usize].pos)
-						.collect();
+						.collect::<Vec<_>>();
+					new_path.insert(0, target);
+					new_path.push(source);
 				}
 				PathStyle::EdgeCenters =>
 				{
-					new_path = vec![];
+					let mut edges = vec![];
+
 					for path_edge in path.windows(2)
 					{
 						let from_idx = path_edge[0];
@@ -717,17 +724,109 @@ impl Map
 						let edge_start = self.navmesh.vtxs[neighbour_edge.idx1];
 						let edge_end = self.navmesh.vtxs[neighbour_edge.idx2];
 
-						new_path.push(edge_start + (edge_end - edge_start) * 0.5);
+						edges.push((edge_start, edge_end));
 					}
+
+					fn compute_path(
+						fracs: &[f32], source: Point3<f32>, target: Point3<f32>,
+						edges: &[(Point3<f32>, Point3<f32>)],
+					) -> Vec<Point3<f32>>
+					{
+						let mut path = vec![target];
+						for (frac, edge) in itertools::izip!(fracs, edges)
+						{
+							let (start, end) = edge;
+							path.push(start + (end - start) * *frac);
+						}
+						path.push(source);
+						path
+					}
+
+					fn relax_step(
+						fracs: &mut [f32], source: Point3<f32>, target: Point3<f32>,
+						edges: &[(Point3<f32>, Point3<f32>)],
+					)
+					{
+						let path = compute_path(fracs, source, target, edges);
+						for (frac, edge, triplet) in itertools::izip!(fracs, edges, path.windows(3))
+						{
+							if let [prev, _, next] = triplet
+							{
+								let (start, end) = edge;
+
+								let edge_vec = end - start;
+								let edge_len = edge_vec.norm();
+								let edge_dir = edge_vec / edge_len;
+
+								let epsilon = 1e-5;
+
+								let project = |point: Point3<f32>, sign: f32| {
+									let point_vec = point - start;
+									let point_len = point_vec.norm();
+									let point_x;
+									let point_y;
+									if point_len < epsilon
+									{
+										point_x = 0.;
+										point_y = 0.;
+									}
+									else
+									{
+										let point_dir = point_vec / point_len;
+										let point_cross = point_dir.cross(&edge_dir);
+										// This is perpendicular to edge_dir, lies on plane of point + edge
+										let point_edge_dir =
+											sign * edge_dir.cross(&point_cross).normalize();
+
+										// These are in the projected coordinate system
+										point_x = point_vec.dot(&edge_dir);
+										point_y = point_vec.dot(&point_edge_dir);
+									}
+									(point_x, point_y)
+								};
+
+								let (prev_x, prev_y) = project(*prev, 1.);
+								let (next_x, next_y) = project(*next, -1.);
+
+								let path_dx = next_x - prev_x;
+								let path_dy = next_y - prev_y;
+
+								let u = if path_dy.abs() < epsilon
+								{
+									0.
+								}
+								else
+								{
+									-prev_y / path_dy
+								};
+
+								let t = (prev_x + u * path_dx) / edge_len;
+
+								let t = t.clamp(0., 1.);
+
+								let lr = 0.5;
+								*frac = *frac * (1. - lr) + t * lr;
+							}
+						}
+					}
+
+					let mut fracs = vec![0.5; edges.len()];
+					for _ in 0..50
+					{
+						relax_step(&mut fracs, source, target, &edges);
+					}
+
+					new_path = compute_path(&fracs, source, target, &edges);
+				}
+				PathStyle::BuiltIn =>
+				{
+					new_path = self.navmesh.plan_path(source, target, 50);
 				}
 			}
-			let mut path = new_path;
+			let path = new_path;
 
 			if path_found
 			{
-				path.insert(0, target);
-				path.push(source);
-
 				for pos in &path
 				{
 					self.path_nodes.push(self.world.spawn((
