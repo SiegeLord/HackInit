@@ -1557,7 +1557,16 @@ impl NavMesh
 							let point_dir = point_vec / point_len;
 							let point_cross = point_dir.cross(&edge_dir);
 							// This is perpendicular to edge_dir, lies on plane of point + edge
-							let point_edge_dir = sign * edge_dir.cross(&point_cross).normalize();
+							let point_edge_vec = sign * edge_dir.cross(&point_cross);
+							let point_edge_len = point_edge_vec.norm();
+							let point_edge_dir = if point_edge_len < epsilon
+							{
+								Vector3::zeros()
+							}
+							else
+							{
+								point_edge_vec / point_edge_len
+							};
 
 							// These are in the projected coordinate system
 							point_x = point_vec.dot(&edge_dir);
