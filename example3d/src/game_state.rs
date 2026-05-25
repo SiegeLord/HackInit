@@ -51,43 +51,7 @@ impl Into<i32> for MaterialKind
 	}
 }
 
-macro_rules! actions {
-	($action_enum:ident { $($variant:ident = [ $bind1:expr, $bind2:expr ]  ),* $(,)? } ) => {
-
-		#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Copy, Clone, Debug, PartialOrd, Ord)]
-		pub enum $action_enum
-		{
-			$($variant,)*
-		}
-
-		impl $action_enum
-		{
-			pub fn new_controls() -> controls::Controls<$action_enum>
-			{
-				let mut action_to_inputs = BTreeMap::new();
-				$(
-					action_to_inputs.insert($action_enum::$variant, [$bind1, $bind2]);
-				)*
-				controls::Controls::new(action_to_inputs)
-			}
-		}
-
-		impl controls::Action for $action_enum
-		{
-			fn to_str(&self) -> &'static str
-			{
-				match self
-				{
-					$(
-						$action_enum::$variant => stringify!($variant),
-					)*
-				}
-			}
-		}
-	}
-}
-
-actions! {
+slhack::actions! {
 	Action
 	{
 		RotateViewLeft = [Some(controls::Input::MouseXNeg), None],

@@ -562,6 +562,19 @@ impl Adam
 	}
 }
 
+#[macro_export]
+macro_rules! enum_dispatch {
+	($expr:expr, ($($variant:path),*), $method:ident $args:tt) =>
+	{
+		match $expr
+		{
+			$(
+				$variant(s) => s.$method $args,
+			)*
+		}
+	}
+}
+
 #[test]
 fn nice_float_test()
 {

@@ -31,22 +31,10 @@ pub struct LoopState
 	cur_screen: Option<Screen>,
 }
 
-macro_rules! enum_dispatch {
-	($expr:expr, ($($variant:path),*), $method:ident $args:tt) =>
-	{
-		match $expr
-		{
-			$(
-				$variant(s) => s.$method $args,
-			)*
-		}
-	}
-}
-
 macro_rules! screen_dispatch {
 	($expr:expr, $method:ident $args:tt) =>
 	{
-		enum_dispatch!($expr, (Screen::Game, Screen::NavMeshTest, Screen::Menu), $method $args)
+		slhack::enum_dispatch!($expr, (Screen::Game, Screen::NavMeshTest, Screen::Menu), $method $args)
 	}
 }
 

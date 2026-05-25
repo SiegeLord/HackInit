@@ -537,7 +537,7 @@ impl Map
 	}
 
 	fn logic(&mut self, state: &mut game_state::GameState)
-		-> Result<Option<game_state::NextScreen>>
+	-> Result<Option<game_state::NextScreen>>
 	{
 		let mut to_die = vec![];
 
