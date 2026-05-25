@@ -43,6 +43,7 @@ impl Menu
 			match action
 			{
 				ui::Action::Start => return Ok(Some(game_state::NextScreen::Game)),
+				ui::Action::NavMeshTest => return Ok(Some(game_state::NextScreen::NavMeshTest)),
 				ui::Action::Quit => return Ok(Some(game_state::NextScreen::Quit)),
 				_ => (),
 			}

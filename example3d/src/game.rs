@@ -298,6 +298,18 @@ impl Map
 			state: &'l game_state::GameState,
 		) -> Option<(scene::Material<game_state::MaterialKind>, &'l Bitmap)>
 		{
+			if material.desc.two_sided
+			{
+				unsafe {
+					gl::Disable(gl::CULL_FACE);
+				}
+			}
+			else
+			{
+				unsafe {
+					gl::Enable(gl::CULL_FACE);
+				}
+			}
 			state
 				.get_bitmap(texture_name)
 				.map(|b| (material.clone(), b))
@@ -310,17 +322,21 @@ impl Map
 			.set_shader_sampler("lightmap", state.get_bitmap("data/level_lightmap.png")?, 1)
 			.ok();
 		state
-			.get_scene("data/test_level_sprytile.glb")
-			.unwrap()
-			.draw(
-				&state.hs.core,
-				&state.hs.prim,
-				|_, _| None,
-				material_mapper,
-				|_, _, _| {},
-				state,
-			);
+			.hs
+			.core
+			.set_shader_uniform("base_color", &[[1.; 4]][..])
+			.ok();
 
+		state.get_scene("data/test_level_sprytile.glb")?.draw(
+			&state.hs.core,
+			&state.hs.prim,
+			|_, _| None,
+			material_mapper,
+			|_, _, _| {},
+			state,
+		);
+
+		// Solid pass.
 		for (_, (position, scene)) in self
 			.world
 			.query::<(&comps::Position, &comps::Scene)>()
@@ -354,6 +370,12 @@ impl Map
 						)
 						.ok();
 				};
+
+			state
+				.hs
+				.core
+				.set_shader_uniform("base_color", &[scene.color.to_rgba_array_f()][..])
+				.ok();
 
 			state.get_scene(&scene.scene).unwrap().draw(
 				&state.hs.core,
@@ -443,6 +465,19 @@ impl Map
 			.hs
 			.core
 			.set_blender(BlendOperation::Add, BlendMode::One, BlendMode::InverseAlpha);
+		let ortho_mat = Matrix4::new_orthographic(
+			0.,
+			state.hs.buffer_width() as f32,
+			state.hs.buffer_height() as f32,
+			0.,
+			state.hs.buffer_height(),
+			-state.hs.buffer_height(),
+		);
+		state
+			.hs
+			.core
+			.use_projection_transform(&utils::mat4_to_transform(ortho_mat));
+		state.hs.core.use_transform(&Transform::identity());
 		Ok(())
 	}
 }

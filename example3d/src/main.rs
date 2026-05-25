@@ -101,10 +101,10 @@ impl game_loop::LoopState for LoopState
 		)?);
 		game_state.resize_display().into_slhack()?;
 
-		//self.cur_screen = Some(Screen::Menu(menu::Menu::new(game_state).into_slhack()?));
-		self.cur_screen = Some(Screen::NavMeshTest(
-			navmesh_test::NavMeshTest::new(game_state).into_slhack()?,
-		));
+		self.cur_screen = Some(Screen::Menu(menu::Menu::new(game_state).into_slhack()?));
+		//self.cur_screen = Some(Screen::NavMeshTest(
+		//	navmesh_test::NavMeshTest::new(game_state).into_slhack()?,
+		//));
 		Ok(())
 	}
 
@@ -165,6 +165,12 @@ impl game_loop::LoopState for LoopState
 			{
 				self.cur_screen = Some(Screen::Game(
 					game::Game::new(&mut self.game_state).into_slhack()?,
+				))
+			}
+			Some(game_state::NextScreen::NavMeshTest) =>
+			{
+				self.cur_screen = Some(Screen::NavMeshTest(
+					navmesh_test::NavMeshTest::new(&mut self.game_state).into_slhack()?,
 				))
 			}
 			Some(game_state::NextScreen::Menu) =>

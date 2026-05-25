@@ -37,6 +37,7 @@ pub enum Action
 	SelectMe,
 	MainMenu,
 	Start,
+	NavMeshTest,
 	Resume,
 	Quit,
 	Back,
@@ -89,6 +90,13 @@ impl MainMenu
 				h,
 				"New Game",
 				Action::Start,
+				THEME.clone(),
+			))],
+			vec![ui::Widget::Button(ui::Button::new(
+				w,
+				h,
+				"Navmesh Test",
+				Action::NavMeshTest,
 				THEME.clone(),
 			))],
 			vec![ui::Widget::Button(ui::Button::new(

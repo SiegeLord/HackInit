@@ -117,6 +117,7 @@ pub enum NextScreen
 {
 	Game,
 	Menu,
+	NavMeshTest,
 	InGameMenu,
 	Quit,
 }
