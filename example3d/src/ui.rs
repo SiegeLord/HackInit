@@ -576,47 +576,51 @@ impl InGameMenu
 	}
 }
 
-pub enum SubScreen
-{
-	MainMenu(MainMenu),
-	ControlsMenu(ControlsMenu),
-	OptionsMenu(OptionsMenu),
-	InGameMenu(InGameMenu),
+macro_rules! subscreen_enum {
+	{$name:ident { $($subscreen_name:ident),*, }} => {
+		pub enum $name
+		{
+			$(
+				$subscreen_name($subscreen_name),
+			)*
+		}
+
+		impl $name
+		{
+			pub fn draw(&self, state: &game_state::GameState)
+			{
+				match self
+				{
+					$($name::$subscreen_name(s) => s.draw(state),)*
+				}
+			}
+
+			pub fn input(&mut self, state: &mut game_state::GameState, event: &Event) -> Option<Action>
+			{
+				match self
+				{
+					$($name::$subscreen_name(s) => s.input(state, event),)*
+				}
+			}
+
+			pub fn resize(&mut self, state: &game_state::GameState)
+			{
+				match self
+				{
+					$($name::$subscreen_name(s) => s.resize(state),)*
+				}
+			}
+		}
+    };
 }
 
-impl SubScreen
-{
-	pub fn draw(&self, state: &game_state::GameState)
+subscreen_enum! {
+	SubScreen
 	{
-		match self
-		{
-			SubScreen::MainMenu(s) => s.draw(state),
-			SubScreen::ControlsMenu(s) => s.draw(state),
-			SubScreen::OptionsMenu(s) => s.draw(state),
-			SubScreen::InGameMenu(s) => s.draw(state),
-		}
-	}
-
-	pub fn input(&mut self, state: &mut game_state::GameState, event: &Event) -> Option<Action>
-	{
-		match self
-		{
-			SubScreen::MainMenu(s) => s.input(state, event),
-			SubScreen::ControlsMenu(s) => s.input(state, event),
-			SubScreen::OptionsMenu(s) => s.input(state, event),
-			SubScreen::InGameMenu(s) => s.input(state, event),
-		}
-	}
-
-	pub fn resize(&mut self, state: &game_state::GameState)
-	{
-		match self
-		{
-			SubScreen::MainMenu(s) => s.resize(state),
-			SubScreen::ControlsMenu(s) => s.resize(state),
-			SubScreen::OptionsMenu(s) => s.resize(state),
-			SubScreen::InGameMenu(s) => s.resize(state),
-		}
+		MainMenu,
+		ControlsMenu,
+		OptionsMenu,
+		InGameMenu,
 	}
 }
 
