@@ -206,8 +206,24 @@ pub fn user_data_path(core: &Core) -> Result<path::PathBuf>
 	Ok(path_buf)
 }
 
-pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
-	core: &Core, filename: &str, version: &str,
+pub struct UserData<'l>
+{
+	source: Source<'l>,
+	element: ConfigElement,
+	pub version: Option<semver::Version>,
+}
+
+impl<'l> UserData<'l>
+{
+	pub fn parse<T: DeserializeOwned + Clone>(&self) -> Result<T>
+	{
+		Ok(from_element::<T>(&self.element, Some(&self.source))
+			.map_err(|e| Error::new(format!("Config parsing error"), Some(Box::new(e))))?)
+	}
+}
+
+pub fn load_user_data_deferred<T>(
+	core: &Core, filename: &str, parse_fn: impl FnOnce(&UserData) -> Result<Option<T>>,
 ) -> Result<Option<T>>
 {
 	let mut path_buf = user_data_path(core)?;
@@ -220,30 +236,49 @@ pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
 		let element = ConfigElement::from_source(&mut source)
 			.map_err(|e| Error::new(format!("Config parsing error"), Some(Box::new(e))))?;
 
-		if let Some(table) = element.as_table()
-		{
-			if !table
+		let version = element.as_table().and_then(|table| {
+			table
 				.get("version")
 				.and_then(|v| v.as_value())
-				.map(|config_version| {
-					let version = semver::Version::parse(version).unwrap();
-					let config_version = semver::Version::parse(config_version).unwrap();
-					version.major == config_version.major && version.minor == config_version.minor
-				})
-				.unwrap_or(false)
-			{
-				return Ok(None);
-			}
-		}
+				.and_then(|config_version| semver::Version::parse(config_version).ok())
+		});
 
-		Ok(Some(from_element::<T>(&element, Some(&source)).map_err(
-			|e| Error::new(format!("Config parsing error"), Some(Box::new(e))),
-		)?))
+		let user_data = UserData {
+			source: source,
+			element: element,
+			version: version,
+		};
+
+		parse_fn(&user_data)
 	}
 	else
 	{
 		Ok(None)
 	}
+}
+
+pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
+	core: &Core, filename: &str, version: &str,
+) -> Result<Option<T>>
+{
+	load_user_data_deferred(core, filename, |user_data| {
+		let version = semver::Version::parse(version).unwrap();
+		if let Some(config_version) = user_data.version.as_ref()
+		{
+			if version.major == config_version.major && version.minor == config_version.minor
+			{
+				user_data.parse()
+			}
+			else
+			{
+				Ok(None)
+			}
+		}
+		else
+		{
+			Ok(None)
+		}
+	})
 }
 
 pub fn load_user_data<T: DeserializeOwned + Clone>(core: &Core, filename: &str)

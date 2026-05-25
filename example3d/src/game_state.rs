@@ -76,6 +76,7 @@ slhack::actions! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Options
 {
+	pub version: String,
 	pub gfx: hack_state::GfxOptions,
 
 	pub play_music: bool,
@@ -90,6 +91,7 @@ impl Default for Options
 	fn default() -> Self
 	{
 		Self {
+			version: VERSION.to_string(),
 			gfx: hack_state::GfxOptions {
 				fullscreen: false,
 				width: 960,
@@ -144,7 +146,28 @@ pub struct GameState
 
 pub fn load_options(core: &Core) -> Result<Options>
 {
-	Ok(utils::load_user_data(core, "options.cfg")?.unwrap_or_default())
+	Ok(
+		utils::load_user_data_deferred(core, "options.cfg", |user_data| {
+			let version = semver::Version::parse(VERSION).unwrap();
+			if let Some(config_version) = user_data.version.as_ref()
+			{
+				if version.major == config_version.major && version.minor == config_version.minor
+				{
+					user_data.parse()
+				}
+				else
+				{
+					// TODO: Migrate previous versions.
+					Ok(None)
+				}
+			}
+			else
+			{
+				Ok(None)
+			}
+		})?
+		.unwrap_or_default(),
+	)
 }
 
 pub fn save_options(core: &Core, options: &Options) -> Result<()>

@@ -46,6 +46,7 @@ memoffset = "0.9.1"
 rapier3d = "0.31.0"
 lbfgsb-rs-pure = "0.1.1"
 itertools = "0.14.0"
+semver = "1.0.28"
 
 [profile.release]
 debug = true
