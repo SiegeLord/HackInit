@@ -174,7 +174,7 @@ pub fn read_to_string(path: &str) -> Result<String>
 		.map_err(|e| Error::new(format!("Couldn't read '{}'", path), Some(Box::new(e))))
 }
 
-pub fn load_config<T: DeserializeOwned + Clone>(file: &str) -> Result<T>
+pub fn load_config<T: DeserializeOwned>(file: &str) -> Result<T>
 {
 	let contents = read_to_string(file)?;
 	let mut source = Source::new(path::Path::new(file), &contents);
@@ -281,7 +281,7 @@ pub fn load_user_data_with_version<T: DeserializeOwned + Clone>(
 	})
 }
 
-pub fn load_user_data<T: DeserializeOwned + Clone>(core: &Core, filename: &str)
+pub fn load_user_data<T: DeserializeOwned>(core: &Core, filename: &str)
 -> Result<Option<T>>
 {
 	let mut path_buf = user_data_path(core)?;

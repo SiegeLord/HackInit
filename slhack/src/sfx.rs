@@ -1,8 +1,8 @@
 use crate::error::Result;
 use crate::utils;
 use nalgebra::{Point2, Point3, UnitQuaternion, Vector3};
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use allegro::*;
 use allegro_acodec::*;
@@ -214,8 +214,9 @@ impl Sfx
 		Ok(instance)
 	}
 
-	pub fn play_positional_sound(
-		&mut self, name: &str, sound_pos: Point2<f32>, camera_pos: Point2<f32>, volume: f32,
+	pub fn play_positional_sound_with_dist(
+		&mut self, name: &str, sound_pos: Point2<f32>, camera_pos: Point2<f32>, base_dist: f32,
+		volume: f32,
 	) -> Result<()>
 	{
 		self.cache_sample(name)?;
@@ -223,7 +224,6 @@ impl Sfx
 		let sample = self.samples.get(name).unwrap();
 
 		let dist_sq = (sound_pos - camera_pos).norm_squared();
-		let base_dist = 100.;
 		let volume = self.sfx_volume
 			* utils::clamp(
 				self.sfx_volume * volume * base_dist * base_dist / dist_sq,
@@ -246,6 +246,13 @@ impl Sfx
 			.map_err(|_| "Couldn't play sound".to_string())?;
 		self.add_sample_instance(name, instance);
 		Ok(())
+	}
+
+	pub fn play_positional_sound(
+		&mut self, name: &str, sound_pos: Point2<f32>, camera_pos: Point2<f32>, volume: f32,
+	) -> Result<()>
+	{
+		self.play_positional_sound_with_dist(name, sound_pos, camera_pos, 100., volume)
 	}
 
 	pub fn play_positional_sound_3d(
